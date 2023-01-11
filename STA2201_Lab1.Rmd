@@ -1,0 +1,7 @@
+---
+title: "STA2201_Lab1"
+author: "Alice Huang"
+date: "11/01/2023"
+output: html_document
+---
+
