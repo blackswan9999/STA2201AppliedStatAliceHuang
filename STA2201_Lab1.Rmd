@@ -267,7 +267,18 @@ dm %>% filter(Age == 10 | Age == 20| Age == 30 | Age == 40)%>%
 
 2. Find the age that has the highest female mortality rate each year 
 
+```{r}
+dm %>% group_by(Year) %>%
+  summarize(max_fem_mortality = max(Female))
+```
+
+
 3. Use the `summarize(across())` syntax to calculate the standard deviation of mortality rates by age for the Male, Female and Total populations. 
+
+```{r}
+dm %>% summarize(across(c("Male", "Female", "Total"), sd,na.rm=TRUE))
+```
+
 
 4. The Canadian HMD also provides population sizes over time (https://www.prdh.umontreal.ca/BDLC/data/ont/Population.txt). Use these to calculate the population weighted average mortality rate separately for males and females, for every year. Make a nice line plot showing the result (with meaningful labels/titles) and briefly comment on what you see (1 sentence). Hint: `left_join` will probably be useful here. 
 
