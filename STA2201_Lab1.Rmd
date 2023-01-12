@@ -261,7 +261,7 @@ dp %>% ggplot(aes(x=Year, y=Mortality, color = Age)) + geom_line() + facet_grid(
 ```{r}
 dm %>% filter(Age == 10 | Age == 20| Age == 30 | Age == 40)%>%
   mutate(mf_ratio = Male/Female) %>%
-  ggplot(aes(x=Year, y= mf_ratio, col=Age)) + geom_line()
+  ggplot(aes(x=Year, y= mf_ratio, col=Age)) + geom_line() + theme_bw() + labs(y="ratio of male to female mortality rates")
 ```
 
 
@@ -282,5 +282,25 @@ dm %>% summarize(across(c("Male", "Female", "Total"), sd,na.rm=TRUE))
 
 4. The Canadian HMD also provides population sizes over time (https://www.prdh.umontreal.ca/BDLC/data/ont/Population.txt). Use these to calculate the population weighted average mortality rate separately for males and females, for every year. Make a nice line plot showing the result (with meaningful labels/titles) and briefly comment on what you see (1 sentence). Hint: `left_join` will probably be useful here. 
 
+```{r}
+pop <- read_table("https://www.prdh.umontreal.ca/BDLC/data/ont/Population.txt", skip = 2, col_types = "dcddd")
+pop_dm <- left_join(pop, dm, by=c("Year", "Age"), suffix = c("_pop", "_mort"))
 
+head(pop_dm)
+```
 
+```{r}
+pop_dm %>% mutate(Female_popweight_mort = (Female_pop/Total_pop)*Female_mort) %>% 
+  mutate(Male_popweight_mort = (Male_pop/Total_pop)*Male_mort) %>%  
+  group_by(Year) %>% 
+  summarize(female_avgweighted_pop_mort = sum(Female_popweight_mort, na.rm=TRUE),
+            male_avgweighted_pop_mort = sum(Male_popweight_mort, na.rm=TRUE)) -> newpop
+
+head(newpop)
+```
+```{r}
+newpop %>% pivot_longer(c(female_avgweighted_pop_mort, male_avgweighted_pop_mort), names_to = "sex", values_to = "mortality") %>% 
+  ggplot(aes(x=Year, y=mortality, color = sex)) + geom_line() + theme_bw() + labs(y="population weighted average mortality")
+```
+
+From 1975-2020, it looks like the gap between the Female and Male average population-weighted mortality is increasing.
