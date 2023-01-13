@@ -2,7 +2,9 @@
 title: "STA2201_Lab1"
 author: "Alice Huang"
 date: "11/01/2023"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 # By the end of this lab you should know the basics of
@@ -145,7 +147,7 @@ dm %>%
 
 Now, let's calculate the mean female mortality rate by age over all the years. To do this, we need to `group_by` Age, and then use `summarize` to calculate the mean:
 
-```{r}
+```{r, warning=FALSE}
 dm %>% group_by(Age) %>%
   summarize(mean = mean(Age))
 ```
@@ -268,17 +270,19 @@ dm %>% filter(Age == 10 | Age == 20| Age == 30 | Age == 40)%>%
 2. Find the age that has the highest female mortality rate each year 
 
 ```{r}
-dm %>% group_by(Year) %>%
-  summarize(max_fem_mortality = max(Female))
+dm %>% select(Year, Age, Female) %>%
+  group_by(Year) %>%
+  # subtract 1 since age starts at 0, and R start indexing at 1
+  summarize(m = which.max(Female)-1)
 ```
-
 
 3. Use the `summarize(across())` syntax to calculate the standard deviation of mortality rates by age for the Male, Female and Total populations. 
 
 ```{r}
-dm %>% summarize(across(c("Male", "Female", "Total"), sd,na.rm=TRUE))
+dm %>% summarize(across(c("Male", "Female", "Total"), sd, na.rm=TRUE))
 ```
 
+The standard deviations of mortality rates for the Male, Female and Total populations are respectively 0.3327571,	0.3111401	and 0.2960847.	 
 
 4. The Canadian HMD also provides population sizes over time (https://www.prdh.umontreal.ca/BDLC/data/ont/Population.txt). Use these to calculate the population weighted average mortality rate separately for males and females, for every year. Make a nice line plot showing the result (with meaningful labels/titles) and briefly comment on what you see (1 sentence). Hint: `left_join` will probably be useful here. 
 
@@ -303,4 +307,4 @@ newpop %>% pivot_longer(c(female_avgweighted_pop_mort, male_avgweighted_pop_mort
   ggplot(aes(x=Year, y=mortality, color = sex)) + geom_line() + theme_bw() + labs(y="population weighted average mortality")
 ```
 
-From 1975-2020, it looks like the gap between the Female and Male average population-weighted mortality is increasing.
+From 1975-2020, it looks like the gap between the Female and Male average population-weighted mortality is increasing. The male average population-weighted mortality seems to show a decreasing trend, but the same cannot be said for the female average population-weighted mortality.
