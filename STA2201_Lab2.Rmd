@@ -2,7 +2,10 @@
 title: "STA2201_Lab2"
 author: "Alice Huang"
 date: "18/01/2023"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 # Downloading packages and data
@@ -32,6 +35,12 @@ delay_2022 <- clean_names(delay_2022)
 # note: I obtained these codes from the 'id' column in the `res` object above
 delay_codes <- get_resource("3900e649-f31e-4b79-9f20-4731bbfd94f7")
 delay_data_codebook <- get_resource("ca43ac3d-3940-4315-889b-a9375e7b8aa4")
+
+delay_2022 <- delay_2022 %>% filter(line %in% c("BD", "YU", "SHP", "SRT"))
+delay_2022 <- delay_2022 %>% distinct()
+delay_2022 <- delay_2022 %>% 
+  mutate(station_clean = ifelse(str_starts(station, "ST"), word(station, 1,2), word(station, 1)))
+
 ```
 
 # Lab Exercises
@@ -40,7 +49,7 @@ To be handed in via submission of quarto file (and rendered pdf) to GitHub.
 
 1. Using the `delay_2022` data, plot the five stations with the highest mean delays. Facet the graph by `line`
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 delay_2022 %>%
   group_by(line, station) %>%
   summarise(mean_delay = mean(min_delay)) %>%
@@ -61,7 +70,7 @@ delay_2022 %>%
     + you will then need to `list_package_resources` to get ID for the data file
     + note: the 2014 file you will get from `get_resource` has a bunch of different campaign contributions, so just keep the data that relates to the Mayor election
     
-```{r}
+```{r, warning = FALSE, message=FALSE}
 all_data %>% filter(title=="Elections - Campaign Contributions - 2014 to 2017") %>% 
   select(id) %>% pull -> all_data_id
 
@@ -69,9 +78,12 @@ dflist <- list_package_resources(all_data_id) # obtained code from searching dat
 
 camp2014 <- get_resource("5b230e92-0a22-4a15-9572-0b19cc222985")
 mayorcamp2014 <- camp2014$`2_Mayor_Contributions_2014_election.xls`
+head(mayorcamp2014)
 ```
     
 3. Clean up the data format (fixing the parsing issue and standardizing the column names using `janitor`)
+
+We notice that the column names are numbers, and the first row of the dataframe contains what should be the column names. So we set the first row's values to the column names. We use `clean_names` to make all column names be lowercase with words separated by underscores.
 
 ```{r}
 row_to_names(mayorcamp2014, 1, TRUE, TRUE) -> mayorcamp2014
@@ -90,22 +102,23 @@ skim(mayorcamp2014)
 
 There are 10197 missing values in `contributors_address` column. I wouldn't be worried about this as this information was probably hidden for privacy reasons. 
 
-There are 10188 missing values in the `goods_or_service_desc` column. There are 10166 missing values in the `relationship_to_candidate` column. There are 10197 missing values in the `president_business_manager` column. There are 10197 missing values in the `authorized_representative` column and 10199 missing values in the `ward` column. This likely means that we will not be able to consider these variables with lots of missing data in our data analysis.
+There are 10188 missing values in the `goods_or_service_desc` column. There are 10166 missing values in the `relationship_to_candidate` column. There are 10197 missing values in the `president_business_manager` column. There are 10197 missing values in the `authorized_representative` column and 10199 missing values in the `ward` column. This likely means that we will not be able to consider these variables with lots of missing data in our data analysis. Fortunately there are no missing values in other columns.
 
-The contribution_amount variable is in character format, so we should change it to numeric format.
+The `contribution_amount` variable is in character format, so we change it to numeric format.
+
 ```{r}
 mayorcamp2014$contribution_amount <- as.numeric(mayorcamp2014$contribution_amount)
 ```
 
 5. Visually explore the distribution of values of the contributions. What contributions are notable outliers? Do they share a similar characteristic(s)? It may be useful to plot the distribution of contributions without these outliers to get a better sense of the majority of the data. 
 
-Here is the distribution of contribution amounts.
+Here is the distribution of contribution amounts. 
 
 ```{r}
 mayorcamp2014 %>% ggplot(aes(x=contribution_amount)) + geom_histogram()
 ```
 
-We notice that there are outliers in the contribution amount. Upon closer inspection of the data, it appears that the outliers are from candidates donating to their own campaign. 
+We notice that there are outliers in the contribution amount. Upon closer inspection of the data, it appears that the outliers are from candidates donating to their own campaign. Most donations were \$2500 or less, with the exception being a \$3660 donation from a corporation.
 
 ```{r}
 mayorcamp2014 %>% arrange(desc(contribution_amount)) %>%
@@ -118,7 +131,7 @@ Let's see what distribution looks like if we filter out instances where candidat
 ```{r}
 cand_rels <- mayorcamp2014 %>% select(relationship_to_candidate) %>% unique() 
 mayorcamp2014_nocand <- mayorcamp2014 %>% filter(relationship_to_candidate == "Spouse" | is.na(relationship_to_candidate))
-mayorcamp2014_nocand %>% ggplot(aes(x=contribution_amount)) + geom_histogram(bins = 100)
+mayorcamp2014_nocand %>% ggplot(aes(x=contribution_amount)) + geom_histogram()
 ```
 
 
@@ -128,17 +141,25 @@ mayorcamp2014_nocand %>% ggplot(aes(x=contribution_amount)) + geom_histogram(bin
     + number of contributions
 
 
+Here are the top five candidates in total contributions.
 ```{r}
 mayorcamp2014 %>% group_by(candidate) %>%
   summarise(total_contributions = sum(contribution_amount, na.rm=TRUE)) %>%
   arrange(desc(total_contributions)) %>%
   slice(1:5)
+```
 
+Here are the top five candidates in mean contributions.
+```{r}
 mayorcamp2014 %>% group_by(candidate) %>%
   summarise(mean_contributions = mean(contribution_amount, na.rm=TRUE)) %>%
   arrange(desc(mean_contributions)) %>%
   slice(1:5)
+```
 
+Here are the top five candidates in the number of contributions.
+
+```{r}
 mayorcamp2014 %>% group_by(candidate) %>%
   summarise(number_contributions = n()) %>%
   arrange(desc(number_contributions)) %>%
@@ -151,20 +172,27 @@ mayorcamp2014 %>% group_by(candidate) %>%
 ```{r}
 cand_rels <- mayorcamp2014 %>% select(relationship_to_candidate) %>% unique() 
 mayorcamp2014_nocand <- mayorcamp2014 %>% filter(relationship_to_candidate == "Spouse" | is.na(relationship_to_candidate))
-mayorcamp2014_nocand %>% ggplot(aes(x=contribution_amount)) + geom_histogram(bins = 100)
+mayorcamp2014_nocand %>% ggplot(aes(x=contribution_amount)) + geom_histogram()
 ```
 
+Here are the top five candidates in total contributions.
 ```{r}
 mayorcamp2014_nocand %>% group_by(candidate) %>%
   summarise(total_contributions = sum(contribution_amount, na.rm=TRUE)) %>%
   arrange(desc(total_contributions)) %>%
   slice(1:5)
+```
 
+Here are the top five candidates in mean contributions.
+```{r}
 mayorcamp2014_nocand %>% group_by(candidate) %>%
   summarise(mean_contributions = mean(contribution_amount, na.rm=TRUE)) %>%
   arrange(desc(mean_contributions)) %>%
   slice(1:5)
+```
 
+Here are the top five candidates in number of contributions.
+```{r}
 mayorcamp2014_nocand %>% group_by(candidate) %>%
   summarise(number_contributions = n()) %>%
   arrange(desc(number_contributions)) %>%
@@ -181,4 +209,4 @@ mayorcamp2014 %>% group_by(contributors_name) %>%
   summarise(num_contributors = n())
 ```
 
-
+There were 184 candidates who donated money to more than one candidate.
