@@ -1,0 +1,78 @@
+---
+title: "STA2201_Lab3"
+author: "Alice Huang"
+date: "25/01/2023"
+output: pdf_document
+---
+
+## Question 1
+
+Consider the happiness example from the lecture, with 118 out of 129 women indicating they are happy. We are interested in estimating $\theta$, which is the (true) proportion of women who are happy. Calculate the MLE estimate $\hat{\theta}$ and 95% confidence interval. 
+
+We assume that the number of women who are happy, $Y$ follows a Binomial distribution. $Y \sim Binom(n, \theta)$. Here $n = 129$.
+
+The likelihood function is $\prod \binom{n}{x_i} \theta^{x_i} (1-\theta)^{n-x_i} = (\prod \binom{n}{x_i}) \theta^{n \bar{x}} (1-\theta)^{n^2 -n \bar{x}} $
+
+The log-likelihood is $\ell = \log(\prod \binom{n}{x_i}) + n \bar{x} \log(\theta) + (n^2 - n\bar{x})\log(1-\theta)$
+
+The score function is $\frac{\partial \ell}{\partial \theta} = n \bar{x} \frac{1}{\theta} + (n^2 - n\bar{x}) \frac{1}{1-\theta}(-1)$
+
+$\frac{\partial \ell}{\partial \theta} = 0 \iff n \bar{x} \frac{1}{\theta} = (n^2 - n\bar{x}) \frac{1}{1-\theta}$
+
+$\bar{x} \frac{1}{\theta} = (n - \bar{x}) \frac{1}{1-\theta}$
+
+$\bar{x} (1-\theta) = (n - \bar{x}) \theta$
+
+$\bar{x} - \bar{x} \theta = n\theta - \bar{x} \theta$
+
+$\bar{x} = n\theta$
+
+The MLE is given by the proportion of successes
+$$\hat{\theta} = \frac{\bar{x}}{n} = \frac{118}{129} \approx 0.91$$
+
+## Question 2
+
+Assume a Beta(1,1) prior on $\theta$. Calculate the posterior mean for $\hat{\theta}$ and 95% credible interval. 
+
+Beta(1,1) is the same as Unif(0,1)
+
+From the lecture slides, the posterior density is $\theta|y \sim Beta(y+1, n-y+1)$
+
+## Question 3
+
+Now assume a Beta(10,10) prior on $\theta$. What is the interpretation of this prior? Are we assuming we know more, less or the same amount of information as the prior used in Question 2?
+
+This assumes that there are $\alpha + 1 = 10 , \beta + 1 = 10$. we assume that there are 9 successes and 9 failures. This is more information than the prior in Question 2. The prior in Question 2 is equivalent to Unif(0,1) prior which assumes that everything in (0,1) is equally likely.  
+
+## Question 4
+
+Create a graph in ggplot which illustrates
+
+- The likelihood (easiest option is probably to use `geom_histogram` to plot the histogram of appropriate random variables)
+- The priors and posteriors in question 2 and 3 (use `stat_function` to plot these distributions)
+
+Comment on what you observe. 
+
+```{r}
+library(tidyverse)
+likelihood <- function(x, n, theta){
+  result = rbinom(n=x, size = n, prob=theta)
+  return(result)
+}
+ggplot(x=likelihood(seq(0, 200, by=0.5), 129, 118/129)) + geom_histogram()
+```
+
+
+## Question 5
+
+(No R code required) A study is performed to estimate the effect of a simple training program on basketball free-throw shooting. A random sample of 100 college students is recruited into the study. Each student first shoots 100 free-throws to establish a baseline success probability. Each student then takes 50 practice shots each day for a month. At the end of that time, each student takes 100 shots for a final measurement. Let $\theta$ be the average improvement in success probability. $\theta$ is measured as the final proportion of shots made minus the initial proportion of shots made. 
+
+Given two prior distributions for $\theta$ (explaining each in a sentence):
+
+- A noninformative prior, and
+
+- A subjective/informative prior based on your best knowledge
+
+One possible noninformative prior is Unif(0,1)
+
+A subjective/informative prior is Beta(51, 51). This assumes that they shoot 50 successful shots and 50 failures. 
