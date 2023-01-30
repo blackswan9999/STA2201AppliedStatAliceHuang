@@ -63,7 +63,7 @@ The 95% credible interval is given by $(0.85, 0.95)$
 
 Now assume a Beta(10,10) prior on $\theta$. What is the interpretation of this prior? Are we assuming we know more, less or the same amount of information as the prior used in Question 2?
 
-This assumes that $\alpha + 1 = 10 , \beta + 1 = 10$. we assume that there are 9 successes and 9 failures. This is more information than the prior in Question 2. The prior in Question 2 is equivalent to Unif(0,1) prior which assumes that everything in (0,1) is equally likely. However with a Beta(10,10) prior, you assume that some values are more likely than others, which is extra information.  
+This assumes that 9 successes and 9 failures. This is more information than the prior in Question 2. The prior in Question 2 is equivalent to Unif(0,1) prior which assumes that everything in (0,1) is equally likely. However with a Beta(10,10) prior, you assume that some values are more likely than others, which is extra information.  
 
 ## Question 4
 
