@@ -74,19 +74,26 @@ Create a graph in ggplot which illustrates
 
 Comment on what you observe. 
 
-```{r}
+The posterior density $\pi(\theta|x)$ for $x \sim Binom(n, \theta)$ and $\theta \sim Beta(\alpha, \beta)$ is $\pi(\theta|x) \sim Beta(\alpha + x, n-x+\beta) = Beta(10 + 118, 129-118+10) = Beta(128, 21)$
+
+```{r, message = FALSE}
 library(tidyverse)
 likelihood <- function(theta, n, y){
-  result = choose(n,y)*(theta^(y))*(1-theta)^(n -y)
+  result = choose(n,y)*(theta^(y))*(1-theta)^((n -y))
   return(result)
 }
 
 x_theta = seq(from = 0, to=1, by=0.005)
 y_lik = likelihood(x_theta, 129, 118)
 df = data.frame(x_theta, y_lik)
-ggplot(df, aes(x_theta, y_lik)) + geom_line() + stat_function(fun="rbeta", args = list(129, 1,1), col="red") + stat_function(fun=rbeta, args = list(129, 10, 10), col="blue") + stat_function(fun="rbeta", args = list(529, 119, 12))
+ggplot(df, aes(x_theta, y_lik)) + geom_line() +
+  stat_function(fun="dbeta", args = list(1,1), col="red") +
+  stat_function(fun=dbeta, args = list(10, 10), col="blue") +
+  stat_function(fun="dbeta", args = list(119, 12), col="green") +
+  stat_function(fun="dbeta", args = list(128, 21), col="orange")
 ```
 
+The posterior from Question 2 has a higher mean than the posterior from Question 3. Both posteriors appear to be Beta distributions.
 
 ## Question 5
 
