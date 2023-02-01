@@ -1,0 +1,62 @@
+---
+title: "STA2201 ASSIGNMENT 1"
+author: "Alice Huang"
+date: "31/01/2023"
+output: pdf_document
+---
+
+# QUESTION 1
+
+## Question 1a
+
+Suppose $Y|\theta \sim Poisson(\mu \theta), E(\theta) = 1, Var(\theta) = \sigma^2$. Then $E(Y|\theta) = \mu \theta$ since $Y|\theta$ is Poisson.
+
+By law of total expectation, $E(Y) = E_{\theta}(E_{Y}(Y|\theta)) = E_{\theta}(\mu \theta) = \mu E(\theta) = \mu(1) = \mu$.
+
+Thus $E(Y) = \mu$.
+
+By law of total variance, $Var(Y) = E(Var(Y|\theta)) + Var(E(Y|\theta))$. 
+
+Note that $Var(Y|\theta) = \mu \theta$. We get
+
+$Var(Y) = E(\mu \theta) + Var(\mu \theta) = \mu E(\theta) + \mu^2 Var(\theta) = \mu(1) + \mu^2 \sigma^2 = \mu(1+\mu \sigma^2 )$
+
+## Question 1b
+
+Suppose $\theta \sim Gamma(\alpha, \beta)$ where $\alpha, \beta$ are respectively shape and scale parameters.
+
+$E(\theta) = \alpha \beta, Var(\theta) = \alpha \beta^2 , mgf = (1-\beta t)^{-\alpha}, t < \frac{1}{\beta}$
+
+By law of total expectation, $E(Y) = E_{\theta}(E_{Y}(Y|\theta)) = E_{\theta}(\mu \theta) = \mu E(\theta) = \mu\alpha\beta$.
+
+Thus $E(Y) = \mu\alpha\beta$.
+
+By law of total variance, $Var(Y) = E(Var(Y|\theta)) + Var(E(Y|\theta))$. 
+
+$Var(Y) = E(\mu \theta) + Var(\mu \theta) = \mu \alpha \beta + \mu^2 \alpha \beta^2$
+
+The moment generating function of $Y$ is given by $m(t) = E[e^{tY}]$
+
+## Question 1c
+
+Suppose $\theta \sim Gamma(\alpha, \beta)$ where $\alpha, \beta$ are respectively shape and scale parameters.
+
+$E(\theta) = \alpha \beta, Var(\theta) = \alpha \beta^2$
+
+By law of total expectation, $E(Y) = E_{\theta}(E_{Y}(Y|\theta)) = E_{\theta}(\mu \theta) = \mu E(\theta) = \mu\alpha\beta$.
+
+Thus $E(Y) = \mu\alpha\beta$. Compare this with $E(Y) = \mu$. We get that $\alpha \beta = 1$.
+
+By law of total variance, $Var(Y) = E(Var(Y|\theta)) + Var(E(Y|\theta))$. 
+
+$Var(Y) = E(\mu \theta) + Var(\mu \theta) = \mu \alpha \beta + \mu^2 \alpha \beta^2 = \mu(\alpha \beta + \mu\alpha \beta^2 )$. Compare that with $Var(Y) = \mu(1+\mu\sigma^2)$. We get that $\alpha \beta^2 = \sigma^2$. Since we must also have $\alpha \beta = 1$, this means $\alpha \beta^2 = (\alpha \beta) \beta = \beta = \sigma^2$. 
+
+We must have $\beta = \sigma^2$ and $\alpha = \frac{1}{\sigma^2 }$.
+
+
+# QUESTION 2
+
+```{r}
+hdata <- readxl::read_xlsx()
+```
+
