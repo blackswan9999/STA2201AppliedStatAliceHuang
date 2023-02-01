@@ -25,6 +25,14 @@ $Var(Y) = E(\mu \theta) + Var(\mu \theta) = \mu E(\theta) + \mu^2 Var(\theta) = 
 
 Suppose $\theta \sim Gamma(\alpha, \beta)$ where $\alpha, \beta$ are respectively shape and scale parameters.
 
+Then since $\theta$ is Gamma distributed $\pi(\theta) = \frac{\beta^\alpha x^{\alpha-1}}{\Gamma(\alpha)}e^{-\beta x}$ and since $x|\theta$ is Poisson distributed, $L(x|\theta) =\frac{(\mu\theta)^x}{x!}e^{-\mu\theta}$
+
+We know that $f(y) = \int f(y|\theta)\pi(\theta) d\theta$ so $f(y) \propto f(y|\theta) \pi(\theta)$
+
+$f(y) \propto \frac{(\mu\theta)^x}{x!}e^{-\mu\theta} \frac{\beta^\alpha x^{\alpha-1}}{\Gamma(\alpha)}e^{-\beta x}$
+
+The Negative Binomial probability mass function is $\binom{k+r-1}{k} (1-p)^k p^r$
+
 $E(\theta) = \alpha \beta, Var(\theta) = \alpha \beta^2 , mgf = (1-\beta t)^{-\alpha}, t < \frac{1}{\beta}$
 
 By law of total expectation, $E(Y) = E_{\theta}(E_{Y}(Y|\theta)) = E_{\theta}(\mu \theta) = \mu E(\theta) = \mu\alpha\beta$.
@@ -57,6 +65,168 @@ We must have $\beta = \sigma^2$ and $\alpha = \frac{1}{\sigma^2 }$.
 # QUESTION 2
 
 ```{r}
-hdata <- readxl::read_xlsx()
+hdata1 <- readxl::read_xlsx("pnas.1402786111.sd01.xlsx", sheet = 1)[1:92,]
+hdata2 <- readxl::read_xlsx("pnas.1402786111.sd01.xlsx", sheet = 2)
+hdata3 <- readxl::read_xlsx("pnas.1402786111.sd01.xlsx", sheet = 3)
+hdata4 <- readxl::read_xlsx("pnas.1402786111.sd01.xlsx", sheet = 4)
+hdata5 <- readxl::read_xlsx("pnas.1402786111.sd01.xlsx", sheet = 5)
+hdata6 <- readxl::read_xlsx("pnas.1402786111.sd01.xlsx", sheet = 6)
+hdata7 <- readxl::read_xlsx("pnas.1402786111.sd01.xlsx", sheet = 7)
 ```
+
+
+a) Create three graphs in ggplot that help to visualize patterns in deaths by femininity, minimum pressure, and damage. Discuss what you observe based on your visualizations. 
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+hdata1 %>% ggplot(aes(x=ZMasFem, y=alldeaths, color=Gender_MF)) + geom_point(stat="identity") + scale_color_gradient(low = "blue", high = "#CC3366") + theme_bw()
+
+hdata1 %>% ggplot(aes(x=factor(Gender_MF), y=alldeaths)) + geom_boxplot() 
+```
+
+It appears that overall, there seem to be more feminine named hurricanes with much higher death tolls (outliers). The distribution looks bimodal. If you compare the boxplots for death tolls of male named hurricanes and female named hurricanes, the mean death tolls appear similar, but the feminine named hurricane group seems to have a higher standard error of death tolls and more outliers.
+
+
+```{r}
+hdata1 %>% ggplot(aes(x=`Minpressure_Updated 2014`, y=alldeaths, color=ZMasFem)) + geom_point(stat="identity") + theme_bw() + scale_color_gradient(low = "blue", high = "#CC3366")
+```
+
+It seems that there is a weakly decreasing trend on the graph of minimum pressure against death toll. 
+
+```{r}
+hdata1 %>% ggplot(aes(x=NDAM, y=alldeaths, color=ZMasFem)) + geom_point() + theme_bw() + scale_color_gradient(low = "blue", high = "#CC3366")
+```
+
+It appears that on average, as the amount of damage increases, the death toll increases slightly.
+
+b) Run a Poisson regression with `deaths` as the outcome and `femininity` as the explanatory variable. Interpret the resulting coefficient estimate. Check for overdispersion. If it is an issue, run a quasi-Poisson regression with the same variables. Interpret your results. 
+
+```{r}
+poisreg <- glm(alldeaths ~ ZMasFem, family = "poisson", data=hdata1)
+summary(poisreg)
+```
+
+
+c) Reproduce Model 4 (as described in the text and shown in Table S2).[^1] Report the estimated effect of femininity on deaths assuming a hurricane with median pressure and damage ratings. 
+d) Using Model 4, predict the number of deaths caused by Hurricane Sandy. Interpret your results. 
+e) Describe at least two strengths and two weaknesses of this paper, focusing on the archival analysis. What was done well? What needed improvement?
+f) Are you convinced by the results? If you are, explain why. If you're not, describe what additional data and/or analyses you would like to see to further test the author's hypothesis. 
+
+[^1]: I was able to reproduce the coefficient estimates using the data available but the standard errors were slightly different, so don't worry if that is what you find. 
+
+# Vaccinations
+
+This question relates to COVID-19 vaccination rates in the United States. We are interested in exploring factors that are associated with differences in vaccine coverage by US county. 
+
+- You can download the latest data on vaccination coverage here: https://data.cdc.gov/Vaccinations/COVID-19-Vaccinations-in-the-United-States-County/8xkx-amqh/data. Note that this is updated most days so depending on when you download it, it might be slightly different from others (that's okay). For the purposes of the assignment, please consider data from the 11th of January 2023. Also note that on the same webpage you should be able to find a data dictionary. We will be interested in people who have completed a primary vaccine series (have second dose of a two-dose vaccine or one dose of a single-dose vaccine), which refers to columns that have the `Series_Complete` prefix. 
+- The class repo has a dataset `acs` that contain a range of different demographic, socioeconomic, and health variables by county. These were obtained from the American Community Survey (ACS) via the R package `tidycensus`. For reference, the extraction code can be found in the repo (`acs.R`)
+
+
+a) Perform some exploratory data analysis (EDA) using a dataset combining the vaccination and ACS data, and summarize your observations with the aid of 3-4 key tables or graphs.
+
+```{r, message=FALSE}
+vaxdata <- read_csv("COVID-19_Vaccinations_in_the_United_States_County.csv")
+
+library(tidycensus)
+v17 <- load_variables(2019, "acs5", cache = TRUE) # to search tables
+
+# extract variables of interest
+acs <- get_acs(geography = "county", 
+              variables = c(pop_male = "B05003_008", # population males 18+
+                            pop_female = "B05003_019", # population females 18+
+                            median_age = "B01002_001", # median age
+                            median_income = "B19013_001", # median income
+                            median_rent = "B25064_001",
+                            pop_male_foreign_born = "B05003_010", # foreign males 18+
+                            pop_female_foreign_born = "B05003_021",
+                            white_pop = "B01001A_001", # total white population
+                            total_pop = "B01001_001", # total population
+                            total_pop_educ = "B06009_001", # denom for education
+                            less_hs = "B06009_002", # population with less than high school
+                            high_school = "B06009_003", # high school
+                            some_college = "B06009_004", # some college
+                            bachelor = "B06009_005", # bachelor degree
+                            grad_or_professional = "B06009_006", # grad or professional degree
+                            total_pop_employ = "B23025_001", # denom for employment
+                            employed = "B23025_004", # number employed
+                            unemployed = "B23025_005",
+                            nilf = "B23025_007", # not in labor force
+                            total_pop_health = "B27020_001", # denom for health insurance
+                            health_native = "B27020_003", # native born health insurance
+                            health_foreign_nat = "B27020_009", # foreign naturalized health insurance
+                            health_foreign_non = "B27020_014", # foreign non citizen health insurance
+                            poverty_denom = "B17022_001", # denom for poverty
+                            ratio_income_poverty_low = "B17022_002" # ratio less than 1.3
+                            ), 
+              year = 2019)
+
+```
+
+```{r}
+#vaxdata %>% select(Series_Complete_12Plus, Series_Complete_Yes, Series_Complete_Pop_Pct, Series_Complete_5Plus, Series_Complete_5PlusPop_Pct, Series_Complete_5to17, Series_Complete_5to17Pop_Pct, Series_Complete_12PlusPop_Pct, Series_Complete_18Plus, Series_Complete_18PlusPop_Pct, Series_Complete_18PlusPop_Pct_SVI, Series_Complete_65Plus, Series_Complete)
+```
+
+
+```{r}
+# long format
+acs_wide <- acs %>% 
+  select(-moe) %>% 
+  pivot_wider(names_from = "variable", values_from = "estimate")
+```
+
+```{r}
+#tidy up names
+
+acs_wide <- acs_wide %>% 
+  rename(FIPS = GEOID, county_name = NAME)
+
+#acs_wide <- acs_wide %>% rename(FIPS = fips)
+```
+
+```{r}
+newvaxdata <- inner_join(acs_wide, vaxdata, by="FIPS") 
+```
+
+```{r}
+newvaxdata %>% ggplot(aes(Series_Complete_Yes)) + geom_histogram(bins = 70)
+```
+
+```{r}
+
+```
+
+
+
+b) Build a regression model at the county level to help investigate patterns in the full vaccination rate for the population aged 18+ (that is, people aged 18+ who have completed a primary vaccine series). There is no one right answer here, but you should justify the outcome measure you are using (e.g. counts, proportions, rates, etc) and your distributional assumptions about the outcome measure (e.g. binary, poisson, normal, etc). You should also discuss briefly your model building strategy; what covariates you considered and why (motivated by your EDA)[^2], and how the candidate model was chosen. Interpret your findings, including visualizations where appropriate. 
+
+```{r}
+# create some variables more useful for regression
+
+acs_wide <- acs_wide %>% 
+  mutate(prop_white = white_pop/total_pop,
+         prop_less_than_hs = less_hs/total_pop_educ,
+         prop_bachelor_above = (bachelor + grad_or_professional)/total_pop_educ,
+         total_pop_18plus = pop_male+pop_female,
+         prop_foreign_born = (pop_male_foreign_born+pop_female_foreign_born)/total_pop_18plus,
+         prop_unemployed = unemployed/total_pop_employ,
+         prop_nilf = nilf/total_pop_employ,
+         prop_health_insurance = (health_native+health_foreign_nat+health_foreign_non)/total_pop_health,
+         prop_low_ratio_ip = ratio_income_poverty_low/poverty_denom)
+
+```
+
+
+c) Use your model from b) to predict the proportion of the population aged 18+ in Ada County, Idaho. Briefly discuss how good you think this prediction is, and why. 
+d) Give a brief summary of your analysis. What other variables may be of interest to investigate in future?
+e) Now consider the situation of analysing vaccination rates at the **state** level. Consider the three following options:  
+    1) Regression at the state level, outcome used is the total population 18+ fully vaccinated 
+    2) Regression at the state level, outcome used is the average of the county level full vaccination rates of 18+ population 
+    3) Regression at the county level, outcome used is the total population 18+ fully vaccinated, and include as a covariate a categorical variable (fixed effect) which indicates which state a county is in.
+    
+> Without performing these regressions, briefly discuss how you think these three approaches would differ in terms of the granularity of information used and the type of outcome measure. In your opinion which is the most appropriate analysis, or does it depend on the question being asked?
+
+[^2]: Note that the vaccines dataset also has a `Metro` variable which you are welcome to use in your analyses.
 
