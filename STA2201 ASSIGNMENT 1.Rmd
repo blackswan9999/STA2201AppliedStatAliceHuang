@@ -165,7 +165,7 @@ hdata1 %>% filter(Year >= 1979) %>% ggplot(aes(x=factor(Gender_MF), y=alldeaths)
 ```
 
 
-In the Materials and Methods section, Additional Analyses subsection, the authors write "For hurricanes before 1979 (n = 38), a model in which normalized damage, minimum pressure, MFI, and two two-way interaction terms (MFI × normalized damage, MFI × minimum pressure) were entered generated similar but nonsignificant interactions (MFI × minimum pressure: β = 0.007, P = 0.408, SE = 0.008; MFI × normalized damage: β = 0.00003, P = 0.308, SE = 0.00003). For hurricanes after 1979 (n = 54), a model with normalized damage, minimum pressure, MFI, and two two-way interaction terms (MFI × normalized damage, MFI × minimum pressure) yielded a marginally significant interaction between MFI and normalized damage (β = 0.00001, P = 0.073, SE = 0.000004). The interaction between MFI and minimum pressure was nonsignificant (β = 0.003, P = 0.206, SE = 0.0028). In addition, using the gender of the hurricane name as a binary variable instead of MFI showed similar but nonsignificant interactions (gender of hurricane name × normalized damage: β = −0.00004, P = 0.128, SE = 0.00003; gender of hurricane name × minimum pressure: β = −0.019, P = 0.326, SE = 0.0197)." So if the researchers control for era, the two-way interaction effects of femininity of name and other variables seems to be insignificant, in addition to the main effect of femininity being insignificant in Models 2, and 4. I believe that the strength of the results is overstated in the paper, given that the femininity related coefficients and interactions are not significant when the models are controlled for era. 
+In the Materials and Methods section, Additional Analyses subsection, the authors write "For hurricanes before 1979 (n = 38), a model in which normalized damage, minimum pressure, MFI, and two two-way interaction terms (MFI $\times$ normalized damage, MFI $\times$ minimum pressure) were entered generated similar but nonsignificant interactions (MFI $\times$ minimum pressure: $\beta$ = 0.007, P = 0.408, SE = 0.008; MFI $\times$ normalized damage: $\beta$ = 0.00003, P = 0.308, SE = 0.00003). For hurricanes after 1979 (n = 54), a model with normalized damage, minimum pressure, MFI, and two two-way interaction terms (MFI $\times$ normalized damage, MFI $\times$ minimum pressure) yielded a marginally significant interaction between MFI and normalized damage ($\beta$ = 0.00001, P = 0.073, SE = 0.000004). The interaction between MFI and minimum pressure was nonsignificant ($\beta$ = 0.003, P = 0.206, SE = 0.0028). In addition, using the gender of the hurricane name as a binary variable instead of MFI showed similar but nonsignificant interactions (gender of hurricane name $\times$ normalized damage: $\beta$ = -0.00004, P = 0.128, SE = 0.00003; gender of hurricane name $\times$ minimum pressure: $\beta$ = -0.019, P = 0.326, SE = 0.0197)." So if the researchers control for era, the two-way interaction effects of femininity of name and other variables seems to be insignificant, in addition to the main effect of femininity being insignificant in Models 2, and 4. I believe that the strength of the results is overstated in the paper, given that the femininity related coefficients and interactions are not significant when the models are controlled for era. 
 
 f) Are you convinced by the results? If you are, explain why. If you're not, describe what additional data and/or analyses you would like to see to further test the author's hypothesis. 
 
@@ -191,6 +191,7 @@ This question relates to COVID-19 vaccination rates in the United States. We are
 a) Perform some exploratory data analysis (EDA) using a dataset combining the vaccination and ACS data, and summarize your observations with the aid of 3-4 key tables or graphs.
 
 ```{r, message=FALSE, echo=FALSE}
+library(tidycensus)
 vaxdata <- read_csv("COVID-19_Vaccinations_in_the_United_States_County.csv")
 
 v17 <- load_variables(2019, "acs5", cache = TRUE) # to search tables
@@ -227,7 +228,7 @@ acs <- get_acs(geography = "county",
 
 ```
 
-```{r include=FALSE, echo=FALSE}
+```{r include=FALSE, echo=FALSE, warning=FALSE}
 # code pasted from acs.R file uploaded to Quercus
 vaxdata %>% select(FIPS, Recip_State, Metro_status, Series_Complete_18Plus, Series_Complete_18PlusPop_Pct, Census2019_18PlusPop) -> vaxseries
 
@@ -257,27 +258,20 @@ acs_wide <- acs_wide %>%
 newvaxdata <- inner_join(acs_wide, vaxseries, by="FIPS") 
 ```
 
-```{r}
+```{r, echo=FALSE}
 newvaxdata %>% ggplot(aes(Series_Complete_18Plus)) + geom_histogram()
 newvaxdata %>% ggplot(aes(Series_Complete_18PlusPop_Pct)) + geom_histogram()
 ```
 
-```{r}
-newvaxdata %>% ggplot(aes(x=total_pop_health, y=Series_Complete_18Plus)) + geom_point()
-```
 
-```{r}
+```{r, echo=FALSE}
 newvaxdata %>% ggplot(aes(x=prop_bachelor_above, y=Series_Complete_18PlusPop_Pct)) + geom_point()
 ```
 
-```{r}
+```{r, echo=FALSE}
 newvaxdata %>% ggplot(aes(x=Metro_status, y=Series_Complete_18PlusPop_Pct)) + geom_boxplot()
 ```
 
-
-```{r}
-newvaxdata %>% ggplot(aes(x=median_income, y=Series_Complete_18PlusPop_Pct)) + geom_point()
-```
 
 
 b) Build a regression model at the county level to help investigate patterns in the full vaccination rate for the population aged 18+ (that is, people aged 18+ who have completed a primary vaccine series). There is no one right answer here, but you should justify the outcome measure you are using (e.g. counts, proportions, rates, etc) and your distributional assumptions about the outcome measure (e.g. binary, poisson, normal, etc). You should also discuss briefly your model building strategy; what covariates you considered and why (motivated by your EDA)[^2], and how the candidate model was chosen. Interpret your findings, including visualizations where appropriate. 
