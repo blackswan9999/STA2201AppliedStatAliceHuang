@@ -85,7 +85,7 @@ hdata1 %>% ggplot(aes(x=ZMasFem, y=alldeaths, color=Gender_MF)) + geom_point(sta
 hdata1 %>% ggplot(aes(x=factor(Gender_MF), y=alldeaths)) + geom_boxplot() 
 ```
 
-It appears that overall, there seem to be more feminine named hurricanes with much higher death tolls (outliers). The distribution looks bimodal. If you compare the boxplots for death tolls of male named hurricanes and female named hurricanes, the mean death tolls appear similar, but the feminine named hurricane group seems to have a higher standard error of death tolls and more outliers.
+It appears that overall, there seem to be more feminine named hurricanes with very high death tolls (outliers). The distribution looks bimodal. There doesn't appear to be a clear trend through this scatterplot. If you compare the boxplots for death tolls of male named hurricanes and female named hurricanes, the mean death tolls appear similar, but the feminine named hurricane group seems to have a higher standard error of death tolls and more outliers. 
 
 
 ```{r}
@@ -107,7 +107,7 @@ poisreg <- glm(alldeaths ~ ZMasFem, family = "poisson", data=hdata1)
 summary(poisreg)
 res_poisreg <- residuals(poisreg, type="pearson")
 n=92
-k=1
+k=2
 overdisp_poisreg <- sum(res_poisreg^2)/(n-k)
 overdisp_poisreg
 1- pchisq(overdisp_poisreg, n-k)
@@ -115,7 +115,7 @@ overdisp_poisreg
 
 Under a Poisson regression, for every unit increase in the standardized Masculinity-Femininity score, the death toll is expected to increase by $\exp(0.23840)$.
 
-There seems to be overdispersion because the probability of observing values greater than the dispersion factor is 0.757 > 0.05. So the dispersion factor is not in the tails.
+There seems to be overdispersion because the probability of observing values greater than the dispersion factor is 0.8924091 > 0.05. So the dispersion factor is not in the tails of the chi-squared distribution. So we consider a quasi-poisson model.
 
 ```{r}
 qpoisreg <- glm(alldeaths ~ ZMasFem, family = "quasipoisson", data=hdata1)
@@ -136,6 +136,13 @@ median(hdata1$ZNDAM)
 median(hdata1$ZMinPressure_A)
 ```
 
+The regression equation of Model 4 was $alldeaths = 2.4756 - 0.5521'ZMinPressure_A' + 0.8635ZNDAM + 0.1723ZMasFem + 0.3948ZMasFem*`ZMinPressure_A` + 0.7051ZMasFem*ZNDAM$. The median standardized pressure is -0.07239403 and the median standardized damage is -0.434494. Plugging this in the equation above gives
+
+$alldeaths = 2.4756 - 0.5521(-0.07239403) + 0.8635(-0.434494) + 0.1723ZMasFem + 0.3948(-0.07239403)ZMasFem + 0.7051(-0.434494)ZMasFem$ 
+
+$alldeaths = 2.140383 -0.1626429 (ZMasFem)$
+
+From this equation, it appears that as the ZMasFem index increases by 1 unit (ie the name is more feminine than masculine), the death toll decreases by 0.1626429.  
 
 d) Using Model 4, predict the number of deaths caused by Hurricane Sandy. Interpret your results. 
 
@@ -144,19 +151,28 @@ sandy <- hdata1 %>% filter(Name == "Sandy")
 predict(negbinh, newdata=sandy, type="response")
 ```
 
-Model 4 predicts that Hurricane Sandy caused 20806.74 deaths. However, in reality, Hurricane Sandy only caused 159 deaths. So the prediction from Model 4 was too high. Perhaps this is due to the fact that Hurricane Sandy caused significantly more damage than other hurricanes. Perhaps Model 4 may be overfitted to the data, because the standard errors for ZNDAM and ZNDAM:ZMasFem are small.
+Model 4 predicts that Hurricane Sandy caused 20806.74 deaths. However, in reality, Hurricane Sandy only caused 159 deaths. So the prediction from Model 4 was too high. Perhaps this is due to the fact that Hurricane Sandy caused significantly more damage than other hurricanes. Perhaps Model 4 may be overfitted to the data, because the standard errors for ZNDAM and ZNDAM:ZMasFem coefficient estimates are small, and since there is a small number of variables in the model, large changes in ZNDAM yield disproportionately large changes in death tolls.
 
 e) Describe at least two strengths and two weaknesses of this paper, focusing on the archival analysis. What was done well? What needed improvement?
 
 I think the reasoning behind choosing a negative binomial regression model was reasonable.
 
-In the Archival Study section, paragraph 2, the authors write "For example, a hurricane with a relatively masculine name (MFI = 3) is estimated to cause 15.15 deaths, whereas a hurricane with a relatively feminine name (MFI = 9) is estimated to cause 41.84 deaths. In other words, our model suggests that changing a severe hurricane’s name from Charley (MFI = 2.889, 14.87 deaths) to Eloise (MFI = 8.944, 41.45 deaths) could nearly triple its death toll." I think the effect of name gender on hurricane death toll is overstated, especially in the latter sentence. The authors seemed to have obtained the 14.87 deaths number from the combined death tolls of two hurricanes named Charley, one from 1984 (5 deaths) and another from 2004 (10 deaths). There is only one Hurricane Eloise, which occurred in 1975. It seems strange to compare the death tolls of two hurricanes combined with the death toll of one hurricane. Hurricanes Charley and Eloise occurred in time periods with different technology, politics, and global warming levels. Furthermore, the death toll for Hurricane Eloise doesn't seem accurate, as the dataset suggests that Hurricane Eloise had a death toll of 21, not 41.45 as mentioned. It seems like specific hurricanes were cherry-picked to match the statistical results, and the differences were overstated. 
+Another strength is that the raw dollar amounts of property damage caused by hurricanes were normalized to 2013 monetary values by adjusting them to inflation, wealth and population density. 
+
+One weakness is that the strength of the results seems to be overstated. In the Archival Study section, paragraph 2, the authors write "For example, a hurricane with a relatively masculine name (MFI = 3) is estimated to cause 15.15 deaths, whereas a hurricane with a relatively feminine name (MFI = 9) is estimated to cause 41.84 deaths. In other words, our model suggests that changing a severe hurricane’s name from Charley (MFI = 2.889, 14.87 deaths) to Eloise (MFI = 8.944, 41.45 deaths) could nearly triple its death toll." I think the effect of name gender on hurricane death toll is overstated, especially in the latter sentence. The authors seemed to have obtained the 14.87 deaths number from the combined death tolls of two hurricanes named Charley, one from 1984 (5 deaths) and another from 2004 (10 deaths). There is only one Hurricane Eloise, which occurred in 1975. It seems strange to compare the death tolls of two hurricanes combined with the death toll of one hurricane. Hurricanes Charley and Eloise occurred in time periods with different technology, politics, and global climates. Furthermore, the death toll for Hurricane Eloise doesn't seem accurate, as the dataset suggests that Hurricane Eloise had a death toll of 21, not 41.45 as mentioned in the paper. It seems like specific hurricanes were cherry-picked to match the statistical results, and the differences were overstated. 
 
 
 
 f) Are you convinced by the results? If you are, explain why. If you're not, describe what additional data and/or analyses you would like to see to further test the author's hypothesis. 
 
-I am not convinced by the results. The sample size of hurricanes after the male-female alternating rule was implemented seems rather small.
+I am not convinced by the results. The sample size of hurricanes after the male-female alternating rule was implemented seems rather small. There were only 30 male-named hurricanes. Furthermore, some names like "Able", "Ione" were rated as masculine despite being from the pre-1979 era when female names were much more prevalent in hurricane names. The gender of some old rare names like "Easy", "Inez" seem ambiguous to me. Coders from 2013 may not be familiar with names from the 1950s, and how people living during the 1950s would have responded to the names of the hurricanes. I think there should at least be an effort to recruit older participants who lived closer to those time periods, and may be able to give more accurate perceptions of the names' genders. Otherwise the ambiguous names may be removed, though this would worsen the issue of having a small sample set. 
+
+Only 9 coders determined the femininity of hurricane names. Since the researchers hypothesized that gender of hurricane name has an effect on response and death toll, I think more coders should have been recruited to determine the femininity of hurricane names for a more accurate response.
+
+I also noticed that `ZMinPressure_A`, `ZNDAM` had a correlation of -0.5559824. I would like to see the results of a negative binomial model with an interaction term of `ZMinPressure_A:ZNDAM`.
+
+The death toll did not adjust for the population of the affected areas at the time. I would like to see the death tolls more accurately adjust for population density in the affected areas given census data from the year of the hurricane.
+
 
 
 # Vaccinations
