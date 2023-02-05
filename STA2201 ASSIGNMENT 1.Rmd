@@ -25,23 +25,21 @@ $Var(Y) = E(\mu \theta) + Var(\mu \theta) = \mu E(\theta) + \mu^2 Var(\theta) = 
 
 Suppose $\theta \sim Gamma(\alpha, \beta)$ where $\alpha, \beta$ are respectively shape and scale parameters.
 
-Then since $\theta$ is Gamma distributed $\pi(\theta) = \frac{\beta^\alpha \theta^{\alpha-1}}{\Gamma(\alpha)}e^{-\beta \theta}$ and since $x|\theta$ is Poisson distributed, $L(x|\theta) =\frac{(\mu\theta)^x}{x!}e^{-\mu\theta}$
+Then since $\theta$ is Gamma distributed $\pi(\theta) = \frac{1}{\Gamma(\alpha)\beta^\alpha}\theta^{\alpha-1}e^{-\theta/\beta}$ and since $x|\theta$ is Poisson distributed, $L(x|\theta) =\frac{(\mu\theta)^x}{x!}e^{-\mu\theta}$
 
 We know that $f(y) = \int f(y|\theta)\pi(\theta) d\theta$ so
 
-$f(y) = \int \frac{(\mu\theta)^x}{x!}e^{-\mu\theta} \frac{\beta^\alpha \theta^{\alpha-1}}{\Gamma(\alpha)}e^{-\beta \theta} d\theta = \int \frac{\mu^x \beta^\alpha}{x! \Gamma(\alpha)} \theta^{x+\alpha-1} e^{-(\mu + \beta)\theta} d\theta$
+\begin{align*}
+f(y) &= \int \frac{(\mu\theta)^y}{y!}e^{-\mu\theta} \frac{1}{\Gamma(\alpha)\beta^\alpha}\theta^{\alpha-1}e^{-\theta/\beta} d\theta\\
+&= \int \frac{\mu^y }{y! \Gamma(\alpha)\beta^\alpha} \theta^{y+\alpha-1} e^{-(\mu + 1/\beta)\theta} d\theta\\
+&=  \frac{\mu^y }{y! \Gamma(\alpha)\beta^\alpha} \Gamma(y+\alpha)(\beta/(\beta\mu+1))^{y+\alpha}\int \frac{1}{\Gamma(y+\alpha)(\beta/(\beta\mu+1))^{y+\alpha}} \theta^{y+\alpha-1}e^{-\frac{\theta}{\beta/(\beta\mu+1)}} d\theta\\
+&= \frac{\mu^y }{y! \Gamma(\alpha)\beta^\alpha} \Gamma(y+\alpha)(\beta/(\beta\mu+1))^{y+\alpha}\\
+f(y)&= \binom{y+\alpha-1}{y} (\frac{\beta \mu}{\beta \mu + 1})^{y} (1- \frac{\beta \mu}{\beta \mu + 1})^{\alpha}
+\end{align*}
 
-The Negative Binomial probability mass function is $\binom{k+r-1}{k} (1-p)^k p^r$
+The Negative Binomial probability mass function is $f(k) = \binom{k+r-1}{k} (1-p)^k p^r$
 
-$E(\theta) = \alpha \beta, Var(\theta) = \alpha \beta^2 , mgf = (1-\beta t)^{-\alpha}, t < \frac{1}{\beta}$
-
-By law of total expectation, $E(Y) = E_{\theta}(E_{Y}(Y|\theta)) = E_{\theta}(\mu \theta) = \mu E(\theta) = \mu\alpha\beta$.
-
-Thus $E(Y) = \mu\alpha\beta$.
-
-By law of total variance, $Var(Y) = E(Var(Y|\theta)) + Var(E(Y|\theta))$. 
-
-$Var(Y) = E(\mu \theta) + Var(\mu \theta) = \mu \alpha \beta + \mu^2 \alpha \beta^2$
+Here $p = 1-\frac{\beta \mu}{\beta \mu + 1}, k=y, r=\alpha$.
 
 ## Question 1c
 
@@ -258,15 +256,20 @@ acs_wide <- acs_wide %>%
 newvaxdata <- inner_join(acs_wide, vaxseries, by="FIPS") 
 ```
 
+
+
 ```{r, echo=FALSE}
 newvaxdata %>% ggplot(aes(Series_Complete_18Plus)) + geom_histogram()
 newvaxdata %>% ggplot(aes(Series_Complete_18PlusPop_Pct)) + geom_histogram()
 ```
 
+We can see that the histogram for the number of fully vaccinated adults has a very long right tail. The histogram for the percentage of fully vaccinated adults appears to be symmetric and bell-shaped. 
 
 ```{r, echo=FALSE}
 newvaxdata %>% ggplot(aes(x=prop_bachelor_above, y=Series_Complete_18PlusPop_Pct)) + geom_point()
 ```
+
+We can see that the median percentage of fully vaccinated adults for Metro areas is higher than the median percentage of fully vaccinated adults for Non-Metro areas.
 
 ```{r, echo=FALSE}
 newvaxdata %>% ggplot(aes(x=Metro_status, y=Series_Complete_18PlusPop_Pct)) + geom_boxplot()
@@ -295,7 +298,7 @@ lmbest <- step(lmtest)
 summary(lmbest)
 ```
 
-We also consider using a Poisson regression to model count data. To solve the issue of counts not showing significance, we offset by the population variable. Since the response is being modeled using counts, the explanatory variables should also be modeled using counts. Then we check for overdispersion.
+We also considered using a Poisson regression to model count data, inspired by the shape of the histogram for the death toll. To solve the issue of counts not giving an accurate perception due to not reflecting the underlying population, we offset by the population variable. Since the response is being modeled using counts, the explanatory variables should also be modeled using counts. Then we checked for overdispersion.
 
 ```{r, echo=FALSE}
 poisregvax <- glm(Series_Complete_18Plus ~ Metro_status + median_income + median_rent + total_pop_health + total_pop_employ + bachelor, family="poisson", offset = log(Census2019_18PlusPop), data=newvaxdata)
@@ -306,6 +309,7 @@ k=6
 overdisp_poisregvax <- sum(residuals(poisregvax, type="pearson")^2)/(n-k)
 print("Overdispersion factor")
 overdisp_poisregvax
+1-pchisq(overdisp_poisregvax, n-k)
 ```
 
 Unfortunately, there seemed to be a lot of overdispersion (1016.213) so a Poisson regression is not appropriate as the mean and variance would not be the same. 
@@ -317,7 +321,7 @@ summary(quasipoisreg)
 
 The quasipoisson dispersion parameter was large. Unfortunately, the quasipoisson model seems to have a very high residual deviance given the number of residual degrees of freedom. So we consider a negative binomial model.
 
-The negative binomial model is similar to the Poisson regression model but it does not require the mean and variance to be the same. We also include an offset term for the population in the negative binomial model. 
+The negative binomial model is similar to the Poisson regression model but it does not require the mean and variance to be the same. We also include an offset term for the population in the negative binomial model. This requires assuming that the death count conditioned on the parameters follows a Poisson distribution and that the parameter space follows a Gamma distribution. Poisson distribution 
 
 ```{r, echo=FALSE}
 negbinvax <- MASS::glm.nb(Series_Complete_18Plus ~ total_pop_educ*median_income + total_pop_health*total_pop_employ + Metro_status + median_income*median_rent + Metro_status*median_rent + offset(log(Census2019_18PlusPop)), data=newvaxdata)
