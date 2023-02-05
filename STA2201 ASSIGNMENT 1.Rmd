@@ -34,12 +34,12 @@ f(y) &= \int \frac{(\mu\theta)^y}{y!}e^{-\mu\theta} \frac{1}{\Gamma(\alpha)\beta
 &= \int \frac{\mu^y }{y! \Gamma(\alpha)\beta^\alpha} \theta^{y+\alpha-1} e^{-(\mu + 1/\beta)\theta} d\theta\\
 &=  \frac{\mu^y }{y! \Gamma(\alpha)\beta^\alpha} \Gamma(y+\alpha)(\beta/(\beta\mu+1))^{y+\alpha}\int \frac{1}{\Gamma(y+\alpha)(\beta/(\beta\mu+1))^{y+\alpha}} \theta^{y+\alpha-1}e^{-\frac{\theta}{\beta/(\beta\mu+1)}} d\theta\\
 &= \frac{\mu^y }{y! \Gamma(\alpha)\beta^\alpha} \Gamma(y+\alpha)(\beta/(\beta\mu+1))^{y+\alpha}\\
-f(y)&= \binom{y+\alpha-1}{y} (\frac{\beta \mu}{\beta \mu + 1})^{y} (1- \frac{\beta \mu}{\beta \mu + 1})^{\alpha}
+f(y)&= \binom{y+\alpha-1}{y} (1- \frac{1}{\beta \mu + 1})^{y} (\frac{1}{\beta \mu + 1})^{\alpha}
 \end{align*}
 
 The Negative Binomial probability mass function is $f(k) = \binom{k+r-1}{k} (1-p)^k p^r$
 
-Here $p = 1-\frac{\beta \mu}{\beta \mu + 1}, k=y, r=\alpha$.
+Here $p = \frac{1}{\beta \mu + 1}, k=y, r=\alpha$.
 
 ## Question 1c
 
@@ -63,7 +63,6 @@ We must have $\beta = \sigma^2$ and $\alpha = \frac{1}{\sigma^2 }$.
 ```{r, echo=FALSE}
 hdata1 <- readxl::read_xlsx("pnas.1402786111.sd01.xlsx", sheet = 1)[1:92,]
 ```
-
 
 a) Create three graphs in ggplot that help to visualize patterns in deaths by femininity, minimum pressure, and damage. Discuss what you observe based on your visualizations. 
 
