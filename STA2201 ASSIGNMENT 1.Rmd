@@ -253,19 +253,21 @@ acs_wide <- acs_wide %>%
          prop_low_ratio_ip = ratio_income_poverty_low/poverty_denom)
 
 newvaxdata <- inner_join(acs_wide, vaxseries, by="FIPS") 
+
+newvaxdata <- newvaxdata %>% drop_na()
 ```
 
-
+We can see that the histogram for the number of fully vaccinated adults has a very long right tail. The histogram for the percentage of fully vaccinated adults appears to be symmetric and bell-shaped. 
 
 ```{r, echo=FALSE}
 newvaxdata %>% ggplot(aes(Series_Complete_18Plus)) + geom_histogram()
 newvaxdata %>% ggplot(aes(Series_Complete_18PlusPop_Pct)) + geom_histogram()
 ```
 
-We can see that the histogram for the number of fully vaccinated adults has a very long right tail. The histogram for the percentage of fully vaccinated adults appears to be symmetric and bell-shaped. 
+It appears that there is an increasing trend in the scatterplot plotting the percentage of vaccinated adults against the proportion of residents with a Bachelor's degree or above.
 
 ```{r, echo=FALSE}
-newvaxdata %>% ggplot(aes(x=prop_bachelor_above, y=Series_Complete_18PlusPop_Pct)) + geom_point()
+newvaxdata %>% ggplot(aes(x=prop_bachelor_above, y=Series_Complete_18PlusPop_Pct)) + geom_point() + geom_smooth(method="lm")
 ```
 
 We can see that the median percentage of fully vaccinated adults for Metro areas is higher than the median percentage of fully vaccinated adults for Non-Metro areas.
@@ -274,11 +276,36 @@ We can see that the median percentage of fully vaccinated adults for Metro areas
 newvaxdata %>% ggplot(aes(x=Metro_status, y=Series_Complete_18PlusPop_Pct)) + geom_boxplot()
 ```
 
-
+We also tried making scatter-plots mapping other proportion-related variables against the percentage of vaccinated adults. We noted upward trends for `prop_unemployed` and `prop_health_insurance`. We noted downward trends for `prop_white` and `nilf`. There was a horizontal trendline for `prop_low_ratio_ip`
 
 b) Build a regression model at the county level to help investigate patterns in the full vaccination rate for the population aged 18+ (that is, people aged 18+ who have completed a primary vaccine series). There is no one right answer here, but you should justify the outcome measure you are using (e.g. counts, proportions, rates, etc) and your distributional assumptions about the outcome measure (e.g. binary, poisson, normal, etc). You should also discuss briefly your model building strategy; what covariates you considered and why (motivated by your EDA)[^2], and how the candidate model was chosen. Interpret your findings, including visualizations where appropriate. 
 
-To choose which variables I should include, I guessed which variables would probably have a significant effect on vaccination rates. For example, I guessed that counties with higher rates of post-secondary education would have higher vaccinations. I grouped variables together into clusters (education-related variables, employment-related variables, etc) and guessed which variables would be correlated with each other. For example, I guessed that `median_rent` and `Metro_status` would probably be correlated. I only picked one variable from each cluster to avoid correlation between similar variables. 
+To choose which variables I should include, I guessed which variables would probably have a significant effect on vaccination rates. For example, I guessed that counties with higher rates of post-secondary education would have higher vaccination counts since there was an upward trend in the scatterplot of post-secondary education rates (Bachelor's degree and higher) against vaccination counts, as seen in part a. I grouped variables together into clusters (education-related variables, employment-related variables, etc) and guessed which variables would be correlated with each other. For example, I guessed that `median_rent` and `median_income` would probably be correlated. I only picked one variable from each cluster to avoid correlation between similar variables. Then I computed the correlation between the variables, and if it was >0.5, I considered the interactions between the variables in the models.
+
+```{r eval=FALSE, include=FALSE}
+cor(newvaxdata$median_income, newvaxdata$median_rent)
+cor(newvaxdata$total_pop_health, newvaxdata$employed)
+cor(newvaxdata$total_pop_educ, newvaxdata$total_pop_health)
+cor(newvaxdata$total_pop_health, newvaxdata$bachelor)
+cor(newvaxdata$total_pop_health, newvaxdata$median_income)
+cor(newvaxdata$total_pop_health, newvaxdata$median_rent)
+cor(newvaxdata$total_pop_health, newvaxdata$poverty_denom)
+cor(newvaxdata$total_pop_health, newvaxdata$health_native)
+```
+
+After creating boxplots of `Metro_status` against, `total_pop_health`
+
+```{r}
+newvaxdata %>% ggplot(aes(x=Metro_status, y=total_pop_health)) + geom_boxplot()
+newvaxdata %>% ggplot(aes(x=Metro_status, y=median_income)) + geom_boxplot()
+newvaxdata %>% ggplot(aes(x=Metro_status, y=median_rent)) + geom_boxplot()
+```
+
+
+The correlation between `median_income`, `median_rent` was 0.7641287 so I considered interactions.
+
+The variable `total_pop_health` had a correlation of nearly 1 with some other variables so I just included `total_pop_health` instead of considering interactions with other variables. The correlation between `total_pop_health` and `employed` was 0.9981944 so I decided to just include `total_pop_health` only, instead of considering interactions. The correlation between `total_pop_health` and `total_pop_educ` was 0.9991213 so I decided to just include `total_pop_health` only, instead of considering interactions. The correlation between `bachelor` and `total_pop_health` was 0.9789844 so I decided to just include `total_pop_health` only, instead of considering interactions. The correlation between `total_pop_health` and `health_native` was 0.9894061 so I included `total_pop_health`.
+
 
 First I considered modeling the outcome as proportions, instead of just counts because counts can be interpreted differently depending on the size of the county population. County populations can vary from 66-10081570. I considered making my response `Series_Complete_18PlusPop_Pct`, the percent of people ages 18+ who have completed a primary series (have second dose of a two-dose vaccine or one dose of a single-dose vaccine) based on the jurisdiction and county where vaccine recipient lives. The histogram looked bell-shaped but unfortunately it did not appear to be normal, because the points on the quantile-quantile normal plot did not follow a straight line and it failed the Shapiro Wilk test (rejected null hypothesis is that data is normal). I also tried modelling the log of the proportion but the same issues with non-normality persisted.
 
@@ -290,17 +317,17 @@ shapiro.test(newvaxdata$Series_Complete_18PlusPop_Pct)
 
 ```{r eval=FALSE, include=FALSE}
 # Trying linear model on proportions just for curiosity's sake
-lmtest <- lm(Series_Complete_18PlusPop_Pct ~ Metro_status + prop_less_than_hs + prop_bachelor_above + prop_nilf + prop_health_insurance+ prop_low_ratio_ip, data=newvaxdata)
+lmtest <- lm(Series_Complete_18PlusPop_Pct ~ Metro_status + prop_less_than_hs + prop_bachelor_above + prop_health_insurance+ prop_low_ratio_ip, data=newvaxdata)
 
 lmbest <- step(lmtest)
 
 summary(lmbest)
 ```
 
-We also considered using a Poisson regression to model count data, inspired by the shape of the histogram for the death toll. To solve the issue of counts not giving an accurate perception due to not reflecting the underlying population, we offset by the population variable. Since the response is being modeled using counts, the explanatory variables should also be modeled using counts. Then we checked for overdispersion.
+Inspired by the shape of the histogram for the death toll count, we also considered using a Poisson regression to model death toll counts. To solve the issue of counts not giving an accurate perception due to not reflecting the underlying population, we offset by the population variable. Since the response is being modeled using counts, the explanatory variables should also be modeled using counts. Then we checked for overdispersion, since using a Poisson regression assumes that the mean and variance are the same.
 
 ```{r, echo=FALSE}
-poisregvax <- glm(Series_Complete_18Plus ~ Metro_status + median_income + median_rent + total_pop_health + total_pop_employ + bachelor, family="poisson", offset = log(Census2019_18PlusPop), data=newvaxdata)
+poisregvax <- glm(Series_Complete_18Plus ~ Metro_status + median_income + median_rent + total_pop_health + median_income*median_rent, family="poisson", offset = log(Census2019_18PlusPop), data=newvaxdata)
 
 summary(poisregvax)
 n=3120
@@ -308,27 +335,41 @@ k=6
 overdisp_poisregvax <- sum(residuals(poisregvax, type="pearson")^2)/(n-k)
 print("Overdispersion factor")
 overdisp_poisregvax
+print("Probability of observing overdispersion factor")
 1-pchisq(overdisp_poisregvax, n-k)
 ```
 
-Unfortunately, there seemed to be a lot of overdispersion (1016.213) so a Poisson regression is not appropriate as the mean and variance would not be the same. 
+There seemed to be a lot of overdispersion (1005.821>>1) so a Poisson regression is not appropriate as the mean and variance would not be the same. 
 
 ```{r, echo=FALSE}
-quasipoisreg <- glm(Series_Complete_18Plus ~ Metro_status + median_income + median_rent + total_pop_health + total_pop_employ + total_pop_educ, family="quasipoisson", offset = log(Census2019_18PlusPop), data=newvaxdata)
+quasipoisreg <- glm(Series_Complete_18Plus ~ factor(Metro_status) + median_income + median_rent + total_pop_health + median_income*median_rent, family="quasipoisson", offset = log(Census2019_18PlusPop), data=newvaxdata)
 summary(quasipoisreg)
 ```
 
-The quasipoisson dispersion parameter was large. Unfortunately, the quasipoisson model seems to have a very high residual deviance given the number of residual degrees of freedom. So we consider a negative binomial model.
+Unfortunately, the quasipoisson model seems to have a very high residual deviance given the number of residual degrees of freedom. So we consider a negative binomial model.
 
 The negative binomial model is similar to the Poisson regression model but it does not require the mean and variance to be the same. We also include an offset term for the population in the negative binomial model. This requires assuming that the death count conditioned on the parameters follows a Poisson distribution and that the parameter space follows a Gamma distribution. Poisson distribution 
 
 ```{r, echo=FALSE}
-negbinvax <- MASS::glm.nb(Series_Complete_18Plus ~ total_pop_educ*median_income + total_pop_health*total_pop_employ + Metro_status + median_income*median_rent + Metro_status*median_rent + offset(log(Census2019_18PlusPop)), data=newvaxdata)
+negbinvax <- MASS::glm.nb(Series_Complete_18Plus ~ factor(Metro_status) + median_income + median_rent + total_pop_health + median_income*median_rent + offset(log(Census2019_18PlusPop)), data=newvaxdata)
 
 summary(negbinvax)
 ```
 
-The negative binomial model on the counts seems to have a more reasonable Residual Deviance given the number of degrees of freedom, so we choose the negative binomial model.
+The negative binomial model on the counts seems to have a more reasonable Residual Deviance given the number of degrees of freedom. We also note that the residuals of the negative binomial model have a 0 and the variance is closest to 1. The residuals of the quasipoisson model have much larger variance. Thus we choose the negative binomial model. 
+
+```{r echo=FALSE}
+plot(residuals(quasipoisreg))
+plot(residuals(negbinvax))
+```
+
+
+```{r eval=FALSE, include=FALSE}
+hist(newvaxdata$Series_Complete_18Plus, prob=TRUE, breaks = seq(min(newvaxdata$Series_Complete_18Plus), max(newvaxdata$Series_Complete_18Plus), length.out = 200), xlab="Number of Vaccinated Adults", main="Histogram for Number of Vaccinated Adults")
+lines(density(negbinvax$fitted.values), col="red")
+lines(density(quasipoisreg$fitted.values), col="blue")
+```
+
 
 c) Use your model from b) to predict the proportion of the population aged 18+ in Ada County, Idaho who are fully vaccinated. Briefly discuss how good you think this prediction is, and why. 
  
@@ -337,22 +378,25 @@ ada <- newvaxdata %>% filter(county_name == "Ada County, Idaho")
 ada_pred <- predict(negbinvax, newdata = ada, type="response")
 ```
 
-The model predicts that 263117 people in Ada County will be vaccinated. We divide by the population of people aged 18+ to find the proportion of adults who are fully vaccinated.
+The negative binomial model predicts that 259256 people in Ada County will be vaccinated. We divide by the population of people aged 18+, 369857, to find the proportion of adults who are fully vaccinated.
 
 ```{r, echo=FALSE}
 ada_predq <- predict(quasipoisreg, newdata = ada, type="response")
 ada_pop <- ada %>% select(Census2019_18PlusPop) %>% pull()
+print("Predicted percentage of vaccinated adults under Negative Binomial Model")
 ada_pred/ada_pop
+print("Predicted percentage of vaccinated adults under Quasi-Poisson Model")
 ada_predq/ada_pop
-ada_trueprop <- ada %>% select(Series_Complete_18PlusPop_Pct)
+ada_trueprop <- ada %>% select(Series_Complete_18PlusPop_Pct) %>% pull()
+print("True percentage of vaccinated adults")
 ada_trueprop
 ```
 
-The model predicted that the proportion of the population aged 18+ in Ada County, Idaho who are fully vaccinated, is around 71.1%, compared to the true value of 76.9%. I think this is pretty close.
+The negative binomial model predicted that the proportion of the population aged 18+ in Ada County, Idaho who are fully vaccinated, is around 70%, compared to the true value of 76.9%. I think this is pretty close.
 
-For the sake of comparison, I also tried using the quasi-poisson model for prediction and that yielded 73.6%. However, I will stick with the negative binomial model because I think it will be a better model overall.
+For the sake of comparison, I also tried using the quasi-poisson model for prediction and that yielded around 74%. However, I will stick with the negative binomial model because I think the residual fit is better overall.
 
-Of course, it is difficult to satisfy many theoretical assumptions of the model.
+The negative binomial regression model assumes that the adult vaccination count conditioned on the parameters follows a Poisson distribution. In reality, it is difficult to satisfy the assumption that the adult vaccination count conditioned on the parameters follows a Poisson distribution. That would require that the rate at which adults get vaccinated is constant. The average rate at which adults get vaccinated in a given time period may change depending on vaccine availability and (mis)information about vaccines in the media. Also, people are fully vaccinated, they don't become fully vaccinated again. It is difficult to satisfy the assumption that people got vaccinated independently of each other, especially when workplaces and public places like restaurants and event venues mandated them. Furthermore, people are probably more likely to get vaccinated if their friends and family are also getting vaccinated and encouraging them to do so.
 
 Given the limitations of the model, the prediction still looks reasonably close to the true value so I think the prediction still looks good.
 
