@@ -328,7 +328,7 @@ fit4 %>%
   ggplot(aes(y = education, x = estimated_score)) +
   stat_halfeye() + 
   theme_bw() + 
-  ggtitle("Posterior estimates of scores by education level of mother")
+  ggtitle("Posterior estimates of scores by education level of mother for mother with 110 IQ")
   
 ```
 
@@ -337,6 +337,18 @@ fit4 %>%
 Generate and plot (as a histogram) samples from the posterior predictive distribution for a new kid with a mother who graduated high school and has an IQ of 95. 
 
 ```{r}
+post_samples <- extract(fit4)
+new_mom_hs <- 1
+new_mom_iq <- 95 - mean(kidiq$mom_iq)
+#new_mom <- as.matrix(c(new_mom_hs, new_mom_iq), ncol = 2)
 
+alpha_hat <- post_samples[["alpha"]]
+beta_hat_1 <- post_samples[["beta"]][,1]
+beta_hat_2 <- post_samples[["beta"]][,2]
+
+preds <- alpha_hat + beta_hat_1*new_mom_hs + beta_hat_2*new_mom_iq
+
+preds <- data.frame(preds)
+preds %>% ggplot(aes(x=preds)) + geom_histogram()
 ```
 
