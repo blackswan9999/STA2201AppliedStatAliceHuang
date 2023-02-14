@@ -42,10 +42,10 @@ kidiq %>% ggplot(aes(x=factor(mom_hs), y = kid_score)) + geom_boxplot() + labs(x
 We can see that the median IQ score for children of mothers with high school education was slightly higher than the median IQ score for children of mothers without high school education.
 
 ```{r}
-kidiq %>% ggplot(aes(x=factor(mom_age), y=kid_score)) + geom_boxplot()
+kidiq %>% ggplot(aes(x=factor(mom_age), y=kid_score)) + geom_point()
 ```
 
-There does not appear to be a significant difference between the medians of the kids' IQ scores as the mother's age increases.
+There does not appear to be a significant change in the kids' IQ scores as the mother's age increases.
 
 ```{r}
 kidiq %>% ggplot(aes(x=mom_iq, y=kid_score)) + geom_point()
@@ -178,14 +178,14 @@ data <- list(y = y,
              mu0 = mu0,
              sigma0 = sigma01)
 
-fit2 <- stan(file = here("C:/Users/Alice/Desktop/GRAD SCHOOL/STA2201/STA2201AppliedStatAliceHuang/kids2.stan"),
+fit1 <- stan(file = here("C:/Users/Alice/Desktop/GRAD SCHOOL/STA2201/STA2201AppliedStatAliceHuang/kids2.stan"),
             data = data,
             chains = 3,
             iter = 500)
 ```
 
 ```{r}
-dsamples2 <- fit2  %>% 
+dsamples2 <- fit1  %>% 
   gather_draws(mu, sigma) # gather = long format
 
 # quickly calculate the quantiles using 
@@ -228,8 +228,6 @@ where $X = 1$ if the mother finished high school and zero otherwise.
 
 Let's get the data we need and run the model. 
 
-
-
 ```{r}
 X <- as.matrix(kidiq$mom_hs, ncol = 1) # force this to be a matrix
 K <- 1
@@ -244,7 +242,23 @@ fit2 <- stan(file = here("kids3.stan"),
 ## Question 3
 
 a) Confirm that the estimates of the intercept and slope are comparable to results from `lm()` 
+
+```{r}
+fit2
+```
+
+```{r}
+summary(lm(kid_score ~ mom_hs, data = kidiq))
+```
+
+
 b) Do a `pairs` plot to investigate the joint sample distributions of the slope and intercept. Comment briefly on what you see. Is this potentially a problem?
+
+```{r}
+pairs(fit2, pars = c("alpha", "beta"))
+```
+
+There seems to be strong correlation between alpha and beta, the slope and the intercept. The marginal distribution of alpha follows a symmetric bell shaped distribution. The marginal distribution of beta also follows a symmetric bell shaped distribution. 
 
 
 ## Plotting results
@@ -270,14 +284,50 @@ fit2 %>%
 
 Add in mother's IQ as a covariate and rerun the model. Please  mean center the covariate before putting it into the model. Interpret the coefficient on the (centered) mum's IQ. 
 
+```{r}
+kidiq %>% mutate(mom_iq_cent = mom_iq - mean(mom_iq)) -> kidiq
+
+X <- cbind(as.matrix(kidiq$mom_hs), as.matrix(kidiq$mom_iq_cent)) # force this to be a matrix
+K <- 2
+
+data <- list(y = y, N = length(y), 
+             X =X, K = K)
+fit4 <- stan(file = here("kids3.stan"),
+            data = data, 
+            iter = 1000)
+```
+```{r}
+fit4
+```
+
+When the mom's IQ increase by 1 unit, the kid's IQ is expected to increase by 0.57 units.
 
 ## Question 5 
 
 Confirm the results from Stan agree with `lm()`
 
+```{r}
+summary(lm(kid_score ~ mom_hs + mom_iq_cent, data = kidiq))
+```
+
+
 ## Question 6
 
 Plot the posterior estimates of scores by education of mother for mothers who have an IQ of 110. 
+
+```{r}
+fit4 %>%
+  spread_draws(alpha, beta[k], sigma) %>% 
+     mutate(nhs = alpha, # no high school is just the intercept
+          hs = alpha + beta) %>% 
+  select(nhs, hs) %>% 
+  pivot_longer(nhs:hs, names_to = "education", values_to = "estimated_score") %>% 
+  ggplot(aes(y = education, x = estimated_score)) +
+  stat_halfeye() + 
+  theme_bw() + 
+  ggtitle("Posterior estimates of scores by education level of mother")
+  
+```
 
 ## Question 7
 
