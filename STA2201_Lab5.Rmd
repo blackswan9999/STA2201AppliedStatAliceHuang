@@ -2,20 +2,26 @@
 title: "STA2201_Lab5"
 author: "Alice Huang"
 date: "08/02/2023"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=FALSE, warning=FALSE)
+```
 
 # Introduction
 
 Today we will be starting off using Stan, looking at the kid's test score data set (available in resources for the [Gelman Hill textbook](https://mc-stan.org/rstanarm/reference/rstanarm-datasets.html)). 
 
-```{r, echo=FALSE, warning=FALSE}
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
 library(tidyverse)
 library(rstan)
 library(tidybayes)
 library(here)
 ```
-
 
 The data look like this:
 
@@ -51,7 +57,7 @@ There does not appear to be a significant change in the kids' IQ scores as the m
 kidiq %>% ggplot(aes(x=mom_iq, y=kid_score)) + geom_point()
 ```
 
-It seems that there is weakly positive correlation between the mother's IQ score and the kid's IQ score.
+It seems that there is positive correlation between the mother's IQ score and the kid's IQ score.
 
 # Estimating mean, no covariates
 
@@ -258,8 +264,7 @@ b) Do a `pairs` plot to investigate the joint sample distributions of the slope 
 pairs(fit2, pars = c("alpha", "beta"))
 ```
 
-There seems to be strong correlation between alpha and beta, the slope and the intercept. The marginal distribution of alpha follows a symmetric bell shaped distribution. The marginal distribution of beta also follows a symmetric bell shaped distribution. 
-
+There seems to be strong correlation between alpha and beta, the slope and the intercept. 
 
 ## Plotting results
 
@@ -276,7 +281,6 @@ fit2 %>%
   stat_halfeye() + 
   theme_bw() + 
   ggtitle("Posterior estimates of scores by education level of mother")
-  
 ```
 
 
@@ -317,12 +321,12 @@ Plot the posterior estimates of scores by education of mother for mothers who ha
 
 ```{r}
 fit4 %>%
-  spread_draws(alpha, beta[k], sigma) %>% 
-  # only takes the variable for mom's high school education
-  filter(k==1) %>%
+  spread_draws(alpha, beta[k], sigma) %>%
+  pivot_wider(names_from = k, values_from = beta) %>%
+  rename(beta_1 = `1`, beta_2 = `2`) %>%
   # add effect of mom's iq being 110
-     mutate(nhs = alpha + 0.57*(110 - mean(kidiq$mom_iq)), # no high school is just the intercept
-          hs = alpha + beta + 0.57*(110 - mean(kidiq$mom_iq))) %>% 
+     mutate(nhs = alpha + beta_2*(110 - mean(kidiq$mom_iq)),
+          hs = alpha + beta_1 + beta_2*(110 - mean(kidiq$mom_iq))) %>% 
   select(nhs, hs) %>% 
   pivot_longer(nhs:hs, names_to = "education", values_to = "estimated_score") %>% 
   ggplot(aes(y = education, x = estimated_score)) +
@@ -352,6 +356,6 @@ sigma_hat <- post_samples[["sigma"]]
 
 ppd <- rnorm(n=length(sigma_hat), mean = preds, sd = sigma_hat)
 
-data.frame(ppd) %>% ggplot(aes(x=ppd)) + geom_histogram()
+data.frame(ppd) %>% ggplot(aes(x=ppd)) + geom_histogram() + labs(x="Posterior Predictive distribution")
 ```
 
