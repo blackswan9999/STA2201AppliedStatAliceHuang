@@ -300,7 +300,7 @@ fit4 <- stan(file = here("kids3.stan"),
 fit4
 ```
 
-When the mom's IQ increase by 1 unit, the kid's IQ is expected to increase by 0.57 units.
+When the mom's mean-centred IQ increases by 1 unit, the kid's IQ is expected to increase by 0.57 units.
 
 ## Question 5 
 
@@ -318,8 +318,11 @@ Plot the posterior estimates of scores by education of mother for mothers who ha
 ```{r}
 fit4 %>%
   spread_draws(alpha, beta[k], sigma) %>% 
-     mutate(nhs = alpha, # no high school is just the intercept
-          hs = alpha + beta) %>% 
+  # only takes the variable for mom's high school education
+  filter(k==1) %>%
+  # add effect of mom's iq being 110
+     mutate(nhs = alpha + 0.57*(110 - mean(kidiq$mom_iq)), # no high school is just the intercept
+          hs = alpha + beta + 0.57*(110 - mean(kidiq$mom_iq))) %>% 
   select(nhs, hs) %>% 
   pivot_longer(nhs:hs, names_to = "education", values_to = "estimated_score") %>% 
   ggplot(aes(y = education, x = estimated_score)) +
@@ -333,4 +336,7 @@ fit4 %>%
 
 Generate and plot (as a histogram) samples from the posterior predictive distribution for a new kid with a mother who graduated high school and has an IQ of 95. 
 
+```{r}
+
+```
 
