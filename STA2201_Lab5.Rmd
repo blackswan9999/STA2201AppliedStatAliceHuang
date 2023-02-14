@@ -348,7 +348,10 @@ beta_hat_2 <- post_samples[["beta"]][,2]
 
 preds <- alpha_hat + beta_hat_1*new_mom_hs + beta_hat_2*new_mom_iq
 
-preds <- data.frame(preds)
-preds %>% ggplot(aes(x=preds)) + geom_histogram()
+sigma_hat <- post_samples[["sigma"]]
+
+ppd <- rnorm(n=length(sigma_hat), mean = preds, sd = sigma_hat)
+
+data.frame(ppd) %>% ggplot(aes(x=ppd)) + geom_histogram()
 ```
 
