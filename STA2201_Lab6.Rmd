@@ -180,7 +180,7 @@ dsl <- dsims %>%
   pivot_longer(`1`:`10`, names_to = "sim", values_to = "sim_weight")
 
 dsl %>% 
-  ggplot(aes(sim_weight)) + geom_histogram(aes(y = ..density..), bins = 20)
+  ggplot(aes(sim_weight)) + geom_histogram(aes(y = after_stat(density)), bins = 20)
 ```
 
 ```{r}
@@ -206,7 +206,7 @@ $$
 summary(mod1)$summary[c("beta[1]", "beta[2]"),]
 ```
 
-So $E[\log(y_i)] = \beta_1 + \beta_2 \log(x_i ) $
+So $E[\log(y_i)] = \beta_1 + \beta_2 \log(x_i )$
 
 The expected log birthweight is $1.1624783 + 0.1437529 \log(37) \approx 1.681558$
 
@@ -270,7 +270,7 @@ y <- ds$log_weight
 yrep1 <- extract(mod1)[["log_weight_rep"]]
 yrep2 <- extract(mod2)[["log_weight_rep"]] 
 samp100 <- sample(nrow(yrep1), 100)
-ppc_dens_overlay(y, yrep1[samp100, ])  + ggtitle("distribution of observed versus predicted birthweights")
+ppc_dens_overlay(y, yrep1[samp100, ])  + ggtitle("Distribution of observed versus predicted birthweights")
 ```
 
 ## Question 6
@@ -319,6 +319,29 @@ ppc_stat_grouped(ds$log_weight, yrep1, group = ds$preterm, stat = 'median')
 
 Use a test statistic of the proportion of births under 2.5kg. Calculate the test statistic for the data, and the posterior predictive samples for both models, and plot the comparison (one plot per model). 
 
+```{r}
+teststat <- mean(ds$log_weight<=log(2.5))
+
+teststat_rep <- sapply(1:nrow(yrep1), function(i) mean(yrep1[i,]<=log(2.5)))
+teststat_rep_2 <- sapply(1:nrow(yrep2), function(i) mean(yrep2[i,]<=log(2.5)))
+
+ggplot(data = as_tibble(teststat_rep), aes(value)) + 
+    geom_histogram(aes(fill = "replicated")) + 
+    geom_vline(aes(xintercept = teststat, color = "observed"), lwd = 1.5) + 
+  ggtitle("Model 1: proportion of births less than 2.5kg") + 
+  scale_color_manual(name = "", values = c("observed" = "purple"))+
+  scale_fill_manual(name = "", values = c("replicated" = "pink")) + theme_bw()
+
+ggplot(data = as_tibble(teststat_rep_2), aes(value)) + 
+    geom_histogram(aes(fill = "replicated")) + 
+    geom_vline(aes(xintercept = teststat, color = "observed"), lwd = 1.5) + 
+  ggtitle("Model 2: proportion of births less than 2.5kg") + 
+  scale_color_manual(name = "", values = c("observed" = "purple"))+
+  scale_fill_manual(name = "", values = c("replicated" = "pink")) + theme_bw()
+```
+
+
+
 # LOO
 
 Finally let's calculate the LOO elpd for each model and compare. The first step of this is to get the point-wise log likelihood estimates from each model:
@@ -366,11 +389,47 @@ Create your own PIT histogram "from scratch" for Model 2.
 Based on the original dataset, choose one (or more) additional covariates to add to the linear regression model. Run the model in Stan, and compare with Model 2 above on at least 2 posterior predictive checks.
 
 ```{r}
+ggplot(ds, aes(x=as.factor(sex), y=log_weight)) + geom_boxplot()
+ds %>% ggplot(aes(x=log_gest_c, y=log_weight, color=sex)) + geom_point() + geom_smooth(method="lm")
+```
 
+We add `sex` to Model 2.
+
+```{r}
+ds %>% mutate(sex_num = ifelse(sex == "F", 0, 1)) -> ds
+
+# put into a list
+stan_data3 <- list(N = nrow(ds),
+                  log_weight = ds$log_weight,
+                  log_gest = ds$log_gest_c,
+                  preterm = ds$preterm_f,
+                  log_gest_preterm = ds$log_gest_preterm,
+                  sex = ds$sex_num)
+
+mod3 <- stan(data = stan_data3, 
+             file = here("simple_weight3.stan"),
+             iter = 500,
+             seed = 243)
 ```
 
 
+```{r}
+summary(mod3)$summary[c("beta[1]", "beta[2]", "beta[3]", "beta[4]", "beta[5]", "sigma"),]
+```
 
 
+```{r}
+yrep2 <- extract(mod2)[["log_weight_rep"]]
+ppc_dens_overlay(y, yrep2[samp100, ])
+yrep3 <- extract(mod3)[["log_weight_rep"]]
+ppc_dens_overlay(y, yrep3[samp100, ])
+```
 
+Model 2 seems to be marginally better though the difference is not very significant.
 
+```{r}
+ppc_stat(ds$log_weight, yrep2, stat = 'median')
+ppc_stat(ds$log_weight, yrep3, stat = 'median')
+```
+
+Model 3 seems to be slightly better.
