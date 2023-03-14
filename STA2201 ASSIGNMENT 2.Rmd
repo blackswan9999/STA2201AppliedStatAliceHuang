@@ -207,3 +207,20 @@ wells1 <- stan(data = stan_data,
              seed = 0)
 ```
 
+```{r}
+wells %>% mutate(cent_log_arsenic = log(arsenic) - mean(log(arsenic))) %>%
+  mutate(cent_dist_cent_log_arsenic = cent_dist*cent_log_arsenic) -> wells
+```
+
+```{r}
+stan_data2 <- list(N = nrow(wells),
+                  switch_well = wells$switch,
+                  cent_dist = wells$cent_dist,
+                  cent_log_arsenic = wells$cent_log_arsenic,
+                  cent_dist_cent_log_arsenic = wells$cent_dist_cent_log_arsenic)
+
+wells2 <- stan(data = stan_data2, 
+             file = here("wells2.stan"),
+             iter = 500,
+             seed = 0)
+```
