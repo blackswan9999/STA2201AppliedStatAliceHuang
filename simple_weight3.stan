@@ -30,11 +30,11 @@ parameters {
 // and standard deviation 'sigma'.
 model {
   // Log-likelihood
-  log_weight ~ normal(beta[1] + beta[2] * log_gest + beta[3]*preterm + beta[4]*log_gest_preterm + beta[5]*sex, sigma);
+  log_weight ~ bernoulli_logit(beta[1] + beta[2] * log_gest + beta[3]*preterm + beta[4]*log_gest_preterm + beta[5]*sex, sigma);
 
   // Log-priors
-  target += normal_lpdf(sigma | 0, 1)
-          + normal_lpdf(beta | 0, 1);
+  target += normal_lpdf(sigma | 0, 1);
+  target += normal_lpdf(beta | 0, 1);
 }
 
 generated quantities {
@@ -43,7 +43,7 @@ generated quantities {
 
   for (n in 1:N) {
     real log_weight_hat_n = beta[1] + beta[2] * log_gest[n] + beta[3]*preterm[n] + beta[4]*log_gest_preterm[n] + beta[5]*sex[n];
-    log_lik[n] = normal_lpdf(log_weight[n] | log_weight_hat_n, sigma);
+    log_lik[n] = bernouilli_lpdf(log_weight[n] | log_weight_hat_n, sigma);
     log_weight_rep[n] = normal_rng(log_weight_hat_n, sigma);
   }
 }
