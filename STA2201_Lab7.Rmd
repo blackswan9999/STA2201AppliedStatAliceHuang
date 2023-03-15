@@ -104,6 +104,9 @@ mod1
 ### Model 2
 
 $$\log(\theta_i ) = \alpha_i + \beta x_i$$
+where 
+
+$$\alpha_i \sim N(0,1)$$
 
 ```{r}
 mod2 <- stan(data=stan_data, file = "lab9_2.stan")
@@ -114,6 +117,10 @@ mod2 <- stan(data=stan_data, file = "lab9_2.stan")
 $$\log \theta_i = \alpha_i + \beta x_i$$ with
 
 $$\alpha_i \sim N(\mu, \sigma^2)$$
+
+$$\mu \sim N(0,1)$$
+
+$$\sigma \sim N(0,1)$$
 
 ```{r}
 mod3 <- stan(data=stan_data, file = "lab9_3.stan")
@@ -147,16 +154,17 @@ res <- res_mod1 %>% left_join(res_mod2) %>% left_join(res_mod3)
 
 ```{r}
 res %>% select(median_mod1, median_mod2, median_mod3) %>%
-  pivot_longer(meidan_mod1:median_mod3, names_to = "model", values_to = "log_theta") %>%
+  pivot_longer(median_mod1:median_mod3, names_to = "model", values_to = "log_theta") %>%
   mutate(model = str_remove(model, "median")) %>%
   ggplot(aes(log_theta, fill = model)) + geom_histogram(position = "dodge")
 ```
 
 ```{r}
 res %>% mutate(deaths = observe.i) %>%
-  mutate(log_smr = log(observe.i/expect.i)) %>%
+  mutate(log_smr = log(observe.i/expect.i)) -> res
+res %>%
   ggplot(aes(log_smr, median_mod1, colour = "Model 1")) + 
-  geom_point(size = deaths, alpha = 0.6) +
+  geom_point(aes(size = deaths, alpha = 0.6)) +
   geom_errorbar(aes(ymin = lower_mod1, ymax = upper_mod1, color="Model 1")) +
   geom_abline(slope = 1, intercept =0) + 
   geom_point(aes(log_smr, median_mod2, color = "Model 2", alpha = 0.6)) + 
