@@ -224,3 +224,20 @@ wells2 <- stan(data = stan_data2,
              iter = 500,
              seed = 0)
 ```
+
+```{r}
+summary(wells1)$summary[c("beta[1]", "beta[2]", "beta[3]", "beta[4]"),]
+```
+
+For every unit increase in distance, the odds of switching a well are multiplied by exp(-0.008793405), assuming all other factors are held constant.
+
+For every unit increase in arsenic levels, the odds of switching a well are multiplied by exp(0.467958876), assuming all other factors are held constant.
+
+For every unit increase in distance multiplied by arsenic levels, the odds of switching a well are multiplied by exp(-0.001760422), assuming all other factors are held constant.
+
+## Question 3c
+
+```{r}
+
+```
+
