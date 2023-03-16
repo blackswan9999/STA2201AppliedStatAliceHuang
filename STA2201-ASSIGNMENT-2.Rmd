@@ -178,47 +178,15 @@ sweden <- read_csv("sweden.csv")
 sweden %>% ggplot(aes(x=age, y=deaths, color = year)) + geom_point()
 ```
 
-Over time, the number of deaths for people ages 50-80 has decreased but the number of deaths for people ages 80-100 has risen. It seems that the age with the most deaths has increased over time.
+Over time, the number of deaths for people ages 50-80 has decreased but the number of deaths for people ages 80-100 has risen.
 
 ```{r}
 sweden %>% ggplot(aes(x=age, y=deaths/pop, color = year)) + geom_point()
 ```
 
-```{r}
-sweden %>% filter(year == 2020) %>%
-  ggplot(aes(x=age, y=deaths)) + geom_point()
-```
 
 ## Question 2b
 
-```{r}
-sweden2020 <- sweden %>% filter(year == 2020)
-```
-
-```{r}
-set.seed(999)
-nsims <- 100
-alpha <- abs(rnorm(nsims, 1, 1))
-beta <- abs(rnorm(nsims, 10, 1))
-total_mortality_rate = sum(sweden2020$deaths)/sum(sweden2020$pop)
-sigma <- abs(rnorm(nsims, 0, 1))
-dsims <- tibble(z_age = (sweden2020$age-mean(sweden2020$age))/sd(sweden2020$age))
-
-for(i in 1:nsims){
-  this_mu <- alpha[i]*exp(beta[i]*dsims$z_age) 
-  dsims[paste0(i)] <- this_mu + rnorm(nrow(dsims), 0, sigma)
-}
-
-dsl <- dsims %>% 
-  pivot_longer(`1`:`51`, names_to = "sim", values_to = "sim_mortality_rate")
-
-dsl %>% 
-  ggplot(aes(sim_mortality_rate)) + geom_histogram(aes(y = ..density..), bins = 90, fill = "pink", color = "black") + geom_vline(xintercept = total_mortality_rate, color = "blue", lwd = 1.2, lty = 2) + 
-  theme_bw(base_size = 16) + 
-  annotate("text", x=25, y=0.2, label= "Mortality rate \n across all age groups", 
-           color = "purple", size = 5) +
- xlim(c(-10, 100))
-```
 
 
 
