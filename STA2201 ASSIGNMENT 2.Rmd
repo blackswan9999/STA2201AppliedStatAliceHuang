@@ -15,6 +15,9 @@ library(loo)
 library(tidybayes) 
 ```
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message=FALSE, warning=FALSE, echo=FALSE)
+```
 
 # Question 1
 
@@ -83,43 +86,6 @@ $Var[\hat{\mu}_{BAYES}] = Var\bigg[\frac{\mu_{0}/\sigma^2_{\mu_0} + n\bar{y}/\si
 
 So $\hat{\mu}_{Bayes} \sim N(\frac{\mu_{0}/\sigma^2_{\mu_0} + n\mu/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}, \frac{n/\sigma^2}{(1/\sigma^2_{\mu_0} + n/\sigma^2)^2})$
 
-Then we get 
-
-$$\hat{\mu}_{Bayes} \sim N(\frac{100/(15^2) + 10(112)/15^2}{1/15^2 + 10/15^2}, \frac{10/15^2}{(1/15^2 + 10/15^2)^2}) \sim N(110.9091,18.59504)$$
-
-So 
-
-$$MSE(\hat{\mu}_{Bayes}|\mu^* = 112) = Var(\hat{\mu}|\mu^* ) + (Bias(\hat{\mu}|\mu^*))^2 = 18.59504 + (110.9091 - 112)^2 = 19.7851$$
-
-The bias for $\hat{\mu}_{BAYES}$ is -1.0909.
-
-We have $\mu^* = 112$. The ML estimator is the sample mean, which is $\bar{y}$. $y \sim N(112, 15^2) \implies \bar{y} \sim N(112, \frac{15^2}{10})$.
-
-The bias of the ML estimator is $E(\bar{y}) - 112 = E(y) - 112 = 0$
-
-The MSE of the ML estimator is $MSE = Var(\bar{y}) + (Bias(\bar{y}))^2 = \frac{Var(y)}{10} + 0= \frac{15^2}{10} = 22.5$
-
-$\hat{\mu}_{BAYES}$ has larger bias, lower variance, and lower MSE.
-
-The ML estimator has lower bias, higher variance, and higher MSE.
-
-## Question 1d
-
-We have $\mu^* = 112$. The ML estimator is the sample mean, which is $\bar{y}$. $y \sim N(112, 15^2) \implies \bar{y} \sim N(112, \frac{15^2}{10})$.
-
-Now we derive the distribution of $\hat{\mu}_{BAYES} = \frac{\mu_{0}/\sigma^2_{\mu_0} + n\bar{y}/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}$
-
-Since $y_i | \mu, \sigma^2 \sim N(112, 15^2 )$ we have that 
-
-$E[\hat{\mu}_{BAYES}] = E\bigg[\frac{\mu_{0}/\sigma^2_{\mu_0} + n\bar{y}/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}\bigg] = \frac{\mu_{0}/\sigma^2_{\mu_0} + n\mu/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}$
-
-$Var[\hat{\mu}_{BAYES}] = Var\bigg[\frac{\mu_{0}/\sigma^2_{\mu_0} + n\bar{y}/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}\bigg] = \frac{(n\mu/\sigma^2 )^2 (\sigma^2 /n)}{(1/\sigma^2_{\mu_0} + n/\sigma^2)^2} = \frac{n\mu/\sigma^2}{(1/\sigma^2_{\mu_0} + n/\sigma^2)^2}$
-
-So $\hat{\mu}_{Bayes} \sim N(\frac{\mu_{0}/\sigma^2_{\mu_0} + n\mu/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}, \frac{n\mu/\sigma^2}{(1/\sigma^2_{\mu_0} + n/\sigma^2)^2})$
-
-Then the sample mean of $\hat{\mu}_{Bayes}$, $\bar{\hat{\mu}}_{Bayes}$ follows the following distribution:
-$$N(\frac{\mu_{0}/\sigma^2_{\mu_0} + n\mu/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}, \frac{1/\sigma^2}{(1/\sigma^2_{\mu_0} + n/\sigma^2)^2})$$
-
 We substitute $$\mu_0 = 100, \sigma_{\mu_0} = 15, n=10, \sigma = 15, \mu = 112$$
 
 ```{r}
@@ -129,36 +95,72 @@ n <- 10
 sigma <- 15
 mu <- 112
 
-mu_hat_bayes_bar_mean <- function(mu0, sigma_mu0, n, sigma, mu){
+mu_hat_bayes_mean <- function(mu0, sigma_mu0, n, sigma, mu){
   ((mu0/(sigma_mu0^2)) + (n*mu/(sigma^2)))/((1/(sigma_mu0^2)) + (n/(sigma^2))) }
-mu_hat_bayes_bar_mean(mu0, sigma_mu0, n, sigma, mu)
+mu_hat_bayes_mean(mu0, sigma_mu0, n, sigma, mu)
 
-mu_hat_bayes_bar_var <- function(mu0, sigma_mu0, n, sigma, mu){
-  (1/(sigma^2))/(((1/(sigma_mu0^2))+(n/(sigma^2)))^2) }
-mu_hat_bayes_bar_var(mu0, sigma_mu0, n, sigma, mu)
+mu_hat_bayes_var <- function(mu0, sigma_mu0, n, sigma, mu){
+  (n/(sigma^2))/(((1/(sigma_mu0^2))+(n/(sigma^2)))^2) }
+mu_hat_bayes_var(mu0, sigma_mu0, n, sigma, mu)
 ```
 
 Then we get 
 
-$$\bar{\hat{\mu}}_{Bayes} \sim N(\frac{100/(15^2) + 10(112)/15^2}{1/15^2 + 10/15^2}, \frac{1/15^2}{(1/15^2 + 10/15^2)^2}) \sim N(110.9091,1.859504)$$
+$$\hat{\mu}_{Bayes} \sim N(\frac{100/(15^2) + 10(112)/15^2}{1/15^2 + 10/15^2}, \frac{10/15^2}{(1/15^2 + 10/15^2)^2}) \sim N(110.9091,18.59504)$$
+
+So 
+
+$$MSE(\hat{\mu}_{Bayes}|\mu^* = 112) = Var(\hat{\mu}|\mu^* ) + (Bias(\hat{\mu}|\mu^*))^2 = 18.59504 + (110.9091 - 112)^2 = 19.7851$$
+
+The bias for $\hat{\mu}_{BAYES}$ is $110.9091 - 112 = -1.0909$. The variance of $\hat{\mu}_{BAYES}$ is $18.59504$.
+
+We have $\mu^* = 112$. The ML estimator is the sample mean, which is $\bar{y}$. $y \sim N(112, 15^2) \implies \bar{y} \sim N(112, \frac{15^2}{10})$.
+
+The bias of the ML estimator is $E(\bar{y}|\mu^*) - 112 = E(y) - 112 = 112-112 = 0$
+
+The variance of the ML estimator is $\frac{15^2}{10} = 22.5$.
+
+The MSE of the ML estimator is $MSE = Var(\bar{y}) + (Bias(\bar{y}))^2 = \frac{Var(y)}{10} + 0= \frac{15^2}{10} = 22.5$
+
+$\hat{\mu}_{BAYES}$ has larger magnitude of bias, lower variance, and lower MSE.
+
+The ML estimator has lower bias, higher variance, and higher MSE.
+
+## Question 1d
+
+We have $\mu^* = 112$. The ML estimator is the sample mean, which is $\bar{y}$. 
+
+$y \sim N(112, 15^2) \implies \bar{y} \sim N(112, \frac{15^2}{10})$.
+
+So the sampling distribution of the ML estimate $\bar{y}$ is $N(112, \frac{15^2}{10})$.
+
+Now we derive the distribution of $\hat{\mu}_{BAYES} = \frac{\mu_{0}/\sigma^2_{\mu_0} + n\bar{y}/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}$
+
+Since $y_i | \mu, \sigma^2 \sim N(\mu, \sigma^2 )$ we have that 
+
+$E[\hat{\mu}_{BAYES}] = E\bigg[\frac{\mu_{0}/\sigma^2_{\mu_0} + n\bar{y}/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}\bigg] = \frac{\mu_{0}/\sigma^2_{\mu_0} + n\mu/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}$
+
+$Var[\hat{\mu}_{BAYES}] = Var\bigg[\frac{\mu_{0}/\sigma^2_{\mu_0} + n\bar{y}/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}\bigg] = \frac{(n/\sigma^2 )^2 (\sigma^2 /n)}{(1/\sigma^2_{\mu_0} + n/\sigma^2)^2} = \frac{n/\sigma^2}{(1/\sigma^2_{\mu_0} + n/\sigma^2)^2}$
+
+So $\hat{\mu}_{Bayes} \sim N(\frac{\mu_{0}/\sigma^2_{\mu_0} + n\mu/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2}, \frac{n/\sigma^2}{(1/\sigma^2_{\mu_0} + n/\sigma^2)^2})$
 
 ```{r}
 df = data.frame(x=seq(95, 130, 0.5), 
                 ML_sampling_distribution = dnorm(x=seq(95, 130, 0.5) , mean=112, sd = 15/sqrt(10)),
                 Bayes_estimator_sampling_distribution = dnorm(x=seq(95, 130, 0.5), mean=110.9091, sd = sqrt(18.59504)))
 
-ggplot(df, aes(x=x, y=ML_sampling_distribution)) + geom_line() + stat_function(fun=dnorm, args = list(110.9091, sqrt(18.59504)), col="red")
+ggplot(df, aes(x=x, y=ML_sampling_distribution)) + geom_line() + stat_function(fun=dnorm, args = list(110.9091, sqrt(18.59504)), col="red") + geom_vline(xintercept = 112, col="blue")
 ```
 
-The curve in red represents the Bayesian estimate. We can see that the mean of the Bayesian estimate sampling distribution is lower than the mean of the ML estimate sampling distribution. The variance of the ML estimate sampling distribution seems to be slightly larger and the bias of the ML estimate is smaller. The variance of the Bayesian estimate is smaller but the bias of the Bayesian estimate is larger.
+The curve in red represents the Bayesian estimate. We can see that the mean of the Bayesian estimate sampling distribution is farther from the true mean than the mean of the ML estimate sampling distribution. The variance of the ML estimate sampling distribution seems to be slightly larger than the variance of the Bayesian estimate sampling distribution. The bias of the ML estimate is smaller than the bias of the Bayesian estimate because the peak of the Bayesian estimate sampling distribution is at the true mean. The variance of the Bayesian estimate is smaller but the bias of the Bayesian estimate is larger.
 
 $MSE(\bar{y}|\mu) = Var(\bar{y}|\mu) + [E(\bar{y}|\mu)-\mu]^2 = \frac{\sigma^2}{n}$
 
-$MSE(\hat{\mu}_{Bayes}) = Var(\bar{y}|\mu) + [E(\hat{\mu}_{Bayes}|\mu)-\mu]^2$
+$MSE(\hat{\mu}_{Bayes}) = Var(\hat{\mu}_{Bayes}|\mu) + [E(\hat{\mu}_{Bayes}|\mu)-\mu]^2 = \frac{n/\sigma^2}{(1/\sigma^2_{\mu_0} + n/\sigma^2)^2} + \bigg[\frac{\mu_{0}/\sigma^2_{\mu_0} + n\mu/\sigma^2}{1/\sigma^2_{\mu_0} + n/\sigma^2} - \mu\bigg]^2$
 
 ```{r}
 MSE_Bayes_estimate <- function(mu0, sigma_mu0, n, sigma, mu){
-  r = n*mu_hat_bayes_bar_var(mu0, sigma_mu0, n, sigma, mu) + (mu_hat_bayes_bar_mean(mu0, sigma_mu0, n, sigma, mu) - mu)^2
+  r = mu_hat_bayes_var(mu0, sigma_mu0, n, sigma, mu) + (mu_hat_bayes_mean(mu0, sigma_mu0, n, sigma, mu) - mu)^2
   return(r)
 }
 
@@ -175,10 +177,10 @@ MSE_ratio <- function(mu0, sigma_mu0, n, sigma, mu){
 
 n = seq(0, 20)
   
-plot(n, MSE_ratio(mu0, sigma_mu0, n, sigma, mu), ylab="MSE ratio")
+plot(n, MSE_ratio(mu0, sigma_mu0, n, sigma, mu), ylab="ratio between Bayesian MSE and ML MSE", xlab="sample size")
 ```
 
-We can see that as sample size increases, the ratio of the MSE of the Bayes estimate to the MSE of the ML estimate increases. As we have more data our ML estimate gets closer to our Bayes estimate.
+In general the ratio between the Bayesian estimate's MSE and the ML estimate's MSE is less than or equal to 1. This is expected because the peak of the Bayesian estimate's sampling distribution was to the left of the peak of the ML estimate's sampling distribution. We can see that as sample size increases, the ratio of the MSE of the Bayes estimate to the MSE of the ML estimate increases towards 1. As our sample size increases, our Bayes estimate MSE gets closer to our ML estimate MSE, because we reduce the variance in the ML estimates. As our sample sample size increases, our Bayes estimate also has lower bias.
 
 
 # Question 2
