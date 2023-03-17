@@ -1,7 +1,7 @@
 data {
   int<lower=1> N;
   int<lower=0> deaths[N];
-  int age[N];
+  vector[N] age;
   vector[N] pop;
 }
 
@@ -17,8 +17,8 @@ model {
     target += poisson_log_lpmf(deaths[n] | log(alpha) + beta*age[n] + log(pop[n]));
   }
   // Priors
-  target += normal_lpdf(alpha | 0.0015, 0.01);
-  target += normal_lpdf(beta | 0.005, 0.01);
+  target += normal_lpdf(alpha | 0.02, 0.01);
+  target += normal_lpdf(beta | 0.0025, 0.001);
 }
 
 generated quantities {

@@ -186,6 +186,7 @@ We can see that as sample size increases, the ratio of the MSE of the Bayes esti
 ```{r include=FALSE}
 sweden <- read_csv("sweden.csv")
 ```
+
 ## Question 2a
 
 ```{r}
@@ -202,9 +203,34 @@ We see that as age increases, the mortality rate increases exponentially.
 
 ## Question 2b
 
+Note that $\mu_0 = \alpha \exp(\beta (0)) = \alpha$ so $\alpha$ should be the baseline mortality rate. We will later demean the age covariate before fitting our model so $\alpha$ will be the mortality rate for the age 75 group. In 2019, the median mortality rate across all age groups was around $0.0237$. I expect the mortality rate for 2019 to be close to the mortality rate for 2020. So I set my prior for $\alpha$ to be normally distributed with mean $0.02$.
+
+The rate at which mortality increases for every increase in age should be $\frac{\alpha \exp(\beta(x+1))}{\alpha \exp(\beta x)} = \exp(\beta)$. We expect this to be positive, because as people age, they should have a higher chance of dying. 
+
+```{r}
+sweden2019 <- sweden %>% filter(year == 2019)
+sweden2019 %>% mutate(mort = deaths/pop) -> sweden2019
+median(sweden2019$mort)
+median(sweden2019$mort[2:51] - sweden2019$mort[1:50])
+```
+
+In 2019, the median difference for the mortality rate between consecutive age groups was around 0.0025. We expect differences between consecutive age groups' death rates to get bigger as age increases. We think that setting a prior mean for $\beta$ as 0.0025 should be reasonable.
+
+Mortality rate should be between 0 and 1 so we use a standard deviation of 0.01 so that alpha estimates within 2 standard deviations of the prior mean will fall in (0,1). I think the difference in mortality rate between consecutive age groups should be positive in general, so I set the prior variance for $\beta$ to be 0.001.
+
+I consider $\alpha \sim N(0.02,0.01)$ and $\beta \sim N(0.0025,0.001)$. Then I will simulate mortality rates given these priors and compare them to the 2018 median mortality rate among all age groups.
+
+```{r}
+sweden2018 <- sweden %>% filter(year == 2018)
+sweden2018 %>% mutate(mort = deaths/pop) -> sweden2018
+```
+
 ```{r}
 sweden2020 <- sweden %>% filter(year == 2020)
-sweden2020$age <- sweden2020$age-50
+# We demean the age to improve the fit of the model. Hopefully this will speed up convergence.
+sweden2020$age = sweden2020$age - mean(sweden2020$age)
+# demeaning the population doesn't seem to work because we pass in population into log(alpha) + beta*x + log(pop) and log can't take negative values
+# sweden2020$pop = sweden2020$pop - mean(sweden2020$pop)
 ```
 
 ```{r}
@@ -212,8 +238,8 @@ set.seed(999)
 nsims <- 100
 alpha <- abs(rnorm(nsims, 0.0015, 0.01))
 beta <- abs(rnorm(nsims, 0.005, 0.01))
-sweden2019 <- sweden %>% filter(year == 2019)
-total_mortality_rate = median((sweden2019$deaths)/(sweden2019$pop))
+
+total_mortality_rate = median(sweden2018$mort)
 sigma <- abs(rnorm(nsims, 0, 1))
 dsims <- tibble(z_age = (sweden2020$age-mean(sweden2020$age))/sd(sweden2020$age))
 
@@ -225,27 +251,19 @@ for(i in 1:nsims){
 dsl <- dsims %>% 
   pivot_longer(`1`:`51`, names_to = "sim", values_to = "sim_mortality_rate")
 
-#max_mortality_rate = max(sweden2020$deaths/sweden2020$pop)
-
 dsl %>% 
   ggplot(aes(sim_mortality_rate)) + geom_histogram(aes(y = ..density..), bins = 100, fill = "pink", color = "black") + geom_vline(xintercept = total_mortality_rate, color = "blue", lwd = 0.5, lty = 2) +
   theme_bw(base_size = 16) + 
-  annotate("text", x=10, y=0.2, label= "2019 Median Mortality rate \n across all age groups", 
-           color = "purple", size = 5) +
- xlim(c(-10, 25))
-
-#+ geom_vline(xintercept = max_mortality_rate, color = "red", lwd = 0.5, lty = 2)+
+  annotate("text", x=5, y=0.3, label= "2018 Median Mortality rate \n across all age groups", 
+           color = "blue", size = 5) +
+ xlim(c(-5, 10))
 ```
 
-$\alpha$ should be the baseline mortality rate, ie the mortality rate for the age 50 group. In 2019, the mortality rate for the age 50 group was $200/132747 \approx 0.0015$. I expect the mortality rate for 2019 to be close to the mortality rate for 2020. So I set my prior for $\alpha$ to be normally distributed with mean $0.0015$.
-
-$\exp(\beta) = \frac{\alpha \exp(\beta(x+1))}{\alpha \exp(\beta x)}$ should be the rate at which mortality increases for every increase in age. We expect this to be positive, because as people age, they should have a higher chance of dying. In 2019, the difference for the death rate for the age 51 group and the age 50 group is around 0.0002. We expect differences between consecutive age groups' death rates to get bigger as age increases. We think that setting a prior mean for $\beta$ as 0.005 should be reasonable.
-
-Mortality rate should not exceed 1 so we use a standard deviation of 0.01.
-
-I consider $\alpha \sim N(0.0025,0.01)$ and $\beta \sim N(0.005,0.01)$
+Here we find that most of the simulated mortality rates given $\alpha \sim N(0.02,0.01)$ and $\beta \sim N(0.0025,0.001)$ priors are close to the 2018 median mortality rate across all age groups.
 
 ## Question 2c
+
+Before fitting the model, we demeaned the age to improve the fit of the model. Hopefully this will speed up convergence and reduce correlation between alpha and beta. Demeaning the population doesn't seem to work because some of the demeaned population values will be negative. We pass in population into the model $\mu_x = log(\alpha) + \beta*age_x + log(pop_x)$ and log can't take negative values.
 
 ```{r}
 stan_data_s <- list(N = nrow(sweden2020),
@@ -255,34 +273,50 @@ stan_data_s <- list(N = nrow(sweden2020),
 
 sweden_model <- stan(data = stan_data_s, 
              file = here("sweden.stan"),
-             iter = 3000,
+             iter = 2000,
              seed = 0)
 ```
+
+We see that the model converges as the traceplot shows that the chains mixed well and there are no obvious trends.
 
 ```{r}
 traceplot(sweden_model, pars=c("alpha", "beta"))
 ```
+
+Demeaning the age covariate helped reduce correlation between alpha and beta. If we had not demeaned the age covariate, there would have been very strong correlation between alpha and beta.
+
 ```{r}
-stan_dens(sweden_model, separate_chains = TRUE)
+pairs(sweden_model, pars = c("alpha", "beta"))
 ```
+
+We see that the distributions for alpha and beta generated by each chain are similar.
+
+```{r}
+stan_dens(sweden_model, separate_chains = TRUE, pars = c("alpha", "beta"))
+```
+
+Here is the summary of Model 1.
+
 ```{r}
 summary(sweden_model)[["summary"]][c("alpha","beta"), ]
 ```
 
 
-The mortality rate for age 50 is $0.001343977$. The ratio of mortality rate for every increase in age is $\exp(0.119449114)$
+The mortality rate for age group 75 is $0.0283097$. The ratio of mortality rate between age groups 1 year apart is $\exp(0.1090507)$
 
 ## Question 2d
 
+We compare the densities of 100 sampled datasets to the actual data. The densities of the sampled datasets based on the model are somewhat close to the true data.
+
 ```{r}
-set.seed(1)
-y <- sweden$deaths
+set.seed(0)
+y <- sweden2020$deaths
 yrep1 <- extract(sweden_model)[["log_deaths_rep"]]
 samp100 <- sample(nrow(yrep1), 100)
 ppc_dens_overlay(y, yrep1[samp100, ])
 ```
 
-The observed deaths and replicated deaths are close to each other.
+The median deaths and replicated median deaths are somewhat close to each other.
 
 ```{r}
 ppc_stat(y, yrep1, stat = 'median')
@@ -290,17 +324,17 @@ ppc_stat(y, yrep1, stat = 'median')
 
 ## Question 2e
 
+Again, we demean the age covariate for the entire Sweden mortality dataset, in order to speed up convergence and reduce correlation between $\alpha, \beta$. We create a matrix of death counts where the ij-th element corresponds to the i-th age and j-th year. We extend the previous model to this matrix. We use the same alpha and beta priors.
+
 ```{r}
 sweden$age <- sweden$age - mean(sweden$age)
 N=length(unique(sweden$age))
 M=length(unique(sweden$year))
 
-```
-```{r}
-death_matrix = matrix(sweden$deaths, 
-                         nrow=N, 
-                         ncol=M, 
-                         byrow = FALSE)
+death_matrix = matrix(sweden$deaths,
+                      nrow=N, 
+                      ncol=M, 
+                      byrow = FALSE)
 
 pop_matrix = matrix(sweden$pop, 
                          nrow=N, 
@@ -323,6 +357,13 @@ sweden_model_matrix <- stan(data = stan_data_matrix,
              seed = 0)
 ```
 
+The model seems to have converged.
+
+```{r}
+traceplot(sweden_model_matrix)
+```
+
+
 ```{r}
 summary(sweden_model_matrix)[["summary"]][c(paste0("alpha[",1:31, "]")),1] -> alpha_means
 summary(sweden_model_matrix)[["summary"]][c(paste0("alpha[",1:31, "]")),4] -> alpha_lower
@@ -333,28 +374,56 @@ summary(sweden_model_matrix)[["summary"]][c(paste0("beta[",1:31, "]")),8] -> bet
 year = seq(1990, 2020, by=1)
 alpha_df <- data.frame(year,alpha_means, alpha_lower, alpha_upper)
 beta_df <- data.frame(year,beta_means, beta_lower, beta_upper)
-```
-```{r}
+
 alpha_df %>% ggplot(aes(x=year, y=alpha_means)) + geom_point() + geom_errorbar(aes(ymin=alpha_lower, ymax=alpha_upper))
-```
-```{r}
+
 beta_df %>% ggplot(aes(x=year, y=beta_means)) + geom_point() + geom_errorbar(aes(ymin=beta_lower, ymax=beta_upper))
 ```
 
-It seems that over time, the model estimated lower $\alpha$ coefficients. Over time, the model estimated higher $\beta$ coefficients.
+It seems that over time, the model estimated lower $\alpha$ coefficients. This suggests that the mortality rate for the age 75 group decreased over time. Over time, the model estimated higher $\beta$ coefficients. This suggests that the ratio between mortality rates of age groups 1 year apart increased. 
 
 ## Question 2f
 
 ```{r}
-age = 40:100
-lexp = c()
-for(age_i in age){
-  mort <- alpha_means*exp(beta_means*age_i)
-  lexp[age_i-40+1] = exp(-mort) + lexp[age_i-40]
+life_exp = data.frame(life_expectancy = rep(0, 31))
+
+for(i in 40:100){
+  # model previously demeaned age so we do i-75
+  mu_ai = alpha_means*exp(beta_means*(i-75))
+  summand = exp(-mu_ai)
+  life_exp = life_exp + summand
 }
-plot(year, lexp)
+
+life_exp_lower = data.frame(life_expectancy_lower = rep(0, 31))
+
+for(i in 40:100){
+  # model previously demeaned age so we do i-75
+  mu_ai = alpha_lower*exp(beta_lower*(i-75))
+  summand = exp(-mu_ai)
+  life_exp_lower = life_exp_lower + summand
+}
+
+life_exp_upper = data.frame(life_expectancy_upper = rep(0, 31))
+
+for(i in 40:100){
+  # model previously demeaned age so we do i-75
+  mu_ai = alpha_upper*exp(beta_upper*(i-75))
+  summand = exp(-mu_ai)
+  life_exp_upper = life_exp_upper + summand
+}
+
+
+year = seq(1990, 2020, by=1)
+
+life_exp = cbind(year, life_exp, life_exp_lower, life_exp_upper)
+
+life_exp %>% ggplot(aes(x=year, y=life_expectancy)) + 
+  geom_point() +
+  geom_errorbar(aes(ymin = life_expectancy_lower, ymax = life_expectancy_upper)) +
+  labs(y="Life expectancy for person aged 40")
 ```
 
+We can see that over time, the predicted life expectancy for a person aged 40 increases. The life expectancy estimates are rather high however, because the model predicts someone aged 40 living until their late 90s (between 56-58 years of life left at age 40).
 
 # Question 3
 
