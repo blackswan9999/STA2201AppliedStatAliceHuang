@@ -324,10 +324,37 @@ sweden_model_matrix <- stan(data = stan_data_matrix,
 ```
 
 ```{r}
-summary(sweden_model_matrix)
+summary(sweden_model_matrix)[["summary"]][c(paste0("alpha[",1:31, "]")),1] -> alpha_means
+summary(sweden_model_matrix)[["summary"]][c(paste0("alpha[",1:31, "]")),4] -> alpha_lower
+summary(sweden_model_matrix)[["summary"]][c(paste0("alpha[",1:31, "]")),8] -> alpha_upper
+summary(sweden_model_matrix)[["summary"]][c(paste0("beta[",1:31, "]")),1] -> beta_means
+summary(sweden_model_matrix)[["summary"]][c(paste0("beta[",1:31, "]")),4] -> beta_lower
+summary(sweden_model_matrix)[["summary"]][c(paste0("beta[",1:31, "]")),8] -> beta_upper
+year = seq(1990, 2020, by=1)
+alpha_df <- data.frame(year,alpha_means, alpha_lower, alpha_upper)
+beta_df <- data.frame(year,beta_means, beta_lower, beta_upper)
+```
+```{r}
+alpha_df %>% ggplot(aes(x=year, y=alpha_means)) + geom_point() + geom_errorbar(aes(ymin=alpha_lower, ymax=alpha_upper))
+```
+```{r}
+beta_df %>% ggplot(aes(x=year, y=beta_means)) + geom_point() + geom_errorbar(aes(ymin=beta_lower, ymax=beta_upper))
 ```
 
+It seems that over time, the model estimated lower $\alpha$ coefficients. Over time, the model estimated higher $\beta$ coefficients.
+
 ## Question 2f
+
+```{r}
+age = 40:100
+lexp = c()
+for(age_i in age){
+  mort <- alpha_means*exp(beta_means*age_i)
+  lexp[age_i-40+1] = exp(-mort) + lexp[age_i-40]
+}
+plot(year, lexp)
+```
+
 
 # Question 3
 
