@@ -91,6 +91,18 @@ So
 
 $$MSE(\hat{\mu}_{Bayes}|\mu^* = 112) = Var(\hat{\mu}|\mu^* ) + (Bias(\hat{\mu}|\mu^*))^2 = 18.59504 + (110.9091 - 112)^2 = 19.7851$$
 
+The bias for $\hat{\mu}_{BAYES}$ is -1.0909.
+
+We have $\mu^* = 112$. The ML estimator is the sample mean, which is $\bar{y}$. $y \sim N(112, 15^2) \implies \bar{y} \sim N(112, \frac{15^2}{10})$.
+
+The bias of the ML estimator is $E(\bar{y}) - 112 = E(y) - 112 = 0$
+
+The MSE of the ML estimator is $MSE = Var(\bar{y}) + (Bias(\bar{y}))^2 = \frac{Var(y)}{10} + 0= \frac{15^2}{10} = 22.5$
+
+$\hat{\mu}_{BAYES}$ has larger bias, lower variance, and lower MSE.
+
+The ML estimator has lower bias, higher variance, and higher MSE.
+
 ## Question 1d
 
 We have $\mu^* = 112$. The ML estimator is the sample mean, which is $\bar{y}$. $y \sim N(112, 15^2) \implies \bar{y} \sim N(112, \frac{15^2}{10})$.
@@ -133,10 +145,12 @@ $$\bar{\hat{\mu}}_{Bayes} \sim N(\frac{100/(15^2) + 10(112)/15^2}{1/15^2 + 10/15
 ```{r}
 df = data.frame(x=seq(95, 130, 0.5), 
                 ML_sampling_distribution = dnorm(x=seq(95, 130, 0.5) , mean=112, sd = 15/sqrt(10)),
-                Bayes_estimator_sampling_distribution = dnorm(x=seq(95, 130, 0.5), mean=110.9091, sd = sqrt(1.859504)))
+                Bayes_estimator_sampling_distribution = dnorm(x=seq(95, 130, 0.5), mean=110.9091, sd = sqrt(18.59504)))
 
-ggplot(df, aes(x=x, y=ML_sampling_distribution)) + geom_line() + stat_function(fun=dnorm, args = list(110.9091, 1.859504), col="red")
+ggplot(df, aes(x=x, y=ML_sampling_distribution)) + geom_line() + stat_function(fun=dnorm, args = list(110.9091, sqrt(18.59504)), col="red")
 ```
+
+The curve in red represents the Bayesian estimate. We can see that the mean of the Bayesian estimate sampling distribution is lower than the mean of the ML estimate sampling distribution. The variance of the ML estimate sampling distribution seems to be slightly larger and the bias of the ML estimate is smaller. The variance of the Bayesian estimate is smaller but the bias of the Bayesian estimate is larger.
 
 $MSE(\bar{y}|\mu) = Var(\bar{y}|\mu) + [E(\bar{y}|\mu)-\mu]^2 = \frac{\sigma^2}{n}$
 
@@ -164,7 +178,7 @@ n = seq(0, 20)
 plot(n, MSE_ratio(mu0, sigma_mu0, n, sigma, mu), ylab="MSE ratio")
 ```
 
-We can see that as sample size increases, the ratio of the MSE of the Bayes estimate to the MSE of the ML estimate increases.
+We can see that as sample size increases, the ratio of the MSE of the Bayes estimate to the MSE of the ML estimate increases. As we have more data our ML estimate gets closer to our Bayes estimate.
 
 
 # Question 2
@@ -178,29 +192,28 @@ sweden <- read_csv("sweden.csv")
 sweden %>% ggplot(aes(x=age, y=deaths, color = year)) + geom_point()
 ```
 
-Over time, the number of deaths for people ages 50-80 has decreased but the number of deaths for people ages 80-100 has risen. It seems that the age with the most deaths has increased over time.
+Over time, the number of deaths for people ages 50-80 has decreased but the number of deaths for people ages 80-100 has risen. It seems that the age with the most deaths has increased over time. This suggests that people are living longer over time.
 
 ```{r}
 sweden %>% ggplot(aes(x=age, y=deaths/pop, color = year)) + geom_point()
 ```
 
-```{r}
-sweden %>% filter(year == 2020) %>%
-  ggplot(aes(x=age, y=deaths)) + geom_point()
-```
+We see that as age increases, the mortality rate increases exponentially.
 
 ## Question 2b
 
 ```{r}
 sweden2020 <- sweden %>% filter(year == 2020)
+sweden2020$age <- sweden2020$age-50
 ```
 
 ```{r}
 set.seed(999)
 nsims <- 100
-alpha <- abs(rnorm(nsims, 1, 1))
-beta <- abs(rnorm(nsims, 10, 1))
-total_mortality_rate = sum(sweden2020$deaths)/sum(sweden2020$pop)
+alpha <- abs(rnorm(nsims, 0.0015, 0.01))
+beta <- abs(rnorm(nsims, 0.005, 0.01))
+sweden2019 <- sweden %>% filter(year == 2019)
+total_mortality_rate = median((sweden2019$deaths)/(sweden2019$pop))
 sigma <- abs(rnorm(nsims, 0, 1))
 dsims <- tibble(z_age = (sweden2020$age-mean(sweden2020$age))/sd(sweden2020$age))
 
@@ -212,15 +225,109 @@ for(i in 1:nsims){
 dsl <- dsims %>% 
   pivot_longer(`1`:`51`, names_to = "sim", values_to = "sim_mortality_rate")
 
+#max_mortality_rate = max(sweden2020$deaths/sweden2020$pop)
+
 dsl %>% 
-  ggplot(aes(sim_mortality_rate)) + geom_histogram(aes(y = ..density..), bins = 90, fill = "pink", color = "black") + geom_vline(xintercept = total_mortality_rate, color = "blue", lwd = 1.2, lty = 2) + 
+  ggplot(aes(sim_mortality_rate)) + geom_histogram(aes(y = ..density..), bins = 100, fill = "pink", color = "black") + geom_vline(xintercept = total_mortality_rate, color = "blue", lwd = 0.5, lty = 2) +
   theme_bw(base_size = 16) + 
-  annotate("text", x=25, y=0.2, label= "Mortality rate \n across all age groups", 
+  annotate("text", x=10, y=0.2, label= "2019 Median Mortality rate \n across all age groups", 
            color = "purple", size = 5) +
- xlim(c(-10, 100))
+ xlim(c(-10, 25))
+
+#+ geom_vline(xintercept = max_mortality_rate, color = "red", lwd = 0.5, lty = 2)+
+```
+
+$\alpha$ should be the baseline mortality rate, ie the mortality rate for the age 50 group. In 2019, the mortality rate for the age 50 group was $200/132747 \approx 0.0015$. I expect the mortality rate for 2019 to be close to the mortality rate for 2020. So I set my prior for $\alpha$ to be normally distributed with mean $0.0015$.
+
+$\exp(\beta) = \frac{\alpha \exp(\beta(x+1))}{\alpha \exp(\beta x)}$ should be the rate at which mortality increases for every increase in age. We expect this to be positive, because as people age, they should have a higher chance of dying. In 2019, the difference for the death rate for the age 51 group and the age 50 group is around 0.0002. We expect differences between consecutive age groups' death rates to get bigger as age increases. We think that setting a prior mean for $\beta$ as 0.005 should be reasonable.
+
+Mortality rate should not exceed 1 so we use a standard deviation of 0.01.
+
+I consider $\alpha \sim N(0.0025,0.01)$ and $\beta \sim N(0.005,0.01)$
+
+## Question 2c
+
+```{r}
+stan_data_s <- list(N = nrow(sweden2020),
+                  deaths = sweden2020$deaths,
+                  age = sweden2020$age,
+                  pop = sweden2020$pop)
+
+sweden_model <- stan(data = stan_data_s, 
+             file = here("sweden.stan"),
+             iter = 3000,
+             seed = 0)
+```
+
+```{r}
+traceplot(sweden_model, pars=c("alpha", "beta"))
+```
+```{r}
+stan_dens(sweden_model, separate_chains = TRUE)
+```
+```{r}
+summary(sweden_model)[["summary"]][c("alpha","beta"), ]
 ```
 
 
+The mortality rate for age 50 is $0.001343977$. The ratio of mortality rate for every increase in age is $\exp(0.119449114)$
+
+## Question 2d
+
+```{r}
+set.seed(1)
+y <- sweden$deaths
+yrep1 <- extract(sweden_model)[["log_deaths_rep"]]
+samp100 <- sample(nrow(yrep1), 100)
+ppc_dens_overlay(y, yrep1[samp100, ])
+```
+
+The observed deaths and replicated deaths are close to each other.
+
+```{r}
+ppc_stat(y, yrep1, stat = 'median')
+```
+
+## Question 2e
+
+```{r}
+sweden$age <- sweden$age - mean(sweden$age)
+N=length(unique(sweden$age))
+M=length(unique(sweden$year))
+
+```
+```{r}
+death_matrix = matrix(sweden$deaths, 
+                         nrow=N, 
+                         ncol=M, 
+                         byrow = FALSE)
+
+pop_matrix = matrix(sweden$pop, 
+                         nrow=N, 
+                         ncol=M, 
+                         byrow = FALSE)
+
+age_matrix <- matrix(sweden$age, nrow=N, 
+                         ncol=M, byrow=FALSE)
+```
+```{r}
+stan_data_matrix <- list(N = N,
+                     M = M,
+                  deaths = death_matrix,
+                  age = age_matrix,
+                  pop = pop_matrix)
+
+sweden_model_matrix <- stan(data = stan_data_matrix, 
+             file = here("swedenmatrix.stan"),
+             iter = 1000,
+             seed = 0)
+```
+
+```{r}
+summary(sweden_model_matrix)
+```
+
+## Question 2f
 
 # Question 3
 
@@ -234,13 +341,19 @@ wells <- read.table("http://www.stat.columbia.edu/~gelman/arm/examples/arsenic/w
 wells %>% ggplot(aes(x=dist, col=factor(switch))) + geom_boxplot()
 ```
 
+It seems that the median distance of people who switched their well was lower than median distance of people who did not switch their well.
+
 ```{r}
 wells %>% ggplot(aes(x=arsenic, col=factor(switch))) + geom_boxplot()
 ```
 
+The median arsenic level was higher for people who switched their wells than for people who did not switch their wells.
+
 ```{r}
 wells %>% ggplot(aes(x=dist, y=arsenic, col=factor(switch))) + geom_point() + geom_smooth() +theme_bw()
 ```
+
+Distance and arsenic did not appear to be heavily correlated. However it seems that when arsenic levels were higher, more people switched their wells. When distance was greater, more people did not switch their well.
 
 ## Question 3b
 
@@ -258,8 +371,9 @@ stan_data <- list(N = nrow(wells),
 
 wells1 <- stan(data = stan_data, 
              file = here("wells.stan"),
-             iter = 500,
+             iter = 1000,
              seed = 0)
+
 ```
 
 ```{r}
@@ -276,28 +390,39 @@ stan_data2 <- list(N = nrow(wells),
 
 wells2 <- stan(data = stan_data2, 
              file = here("wells2.stan"),
-             iter = 500,
+             iter = 1000,
              seed = 0)
+```
+
+```{r}
+traceplot(wells1, pars = c("beta[1]", "beta[2]", "beta[3]", "beta[4]"))
+traceplot(wells2, pars = c("beta[1]", "beta[2]", "beta[3]", "beta[4]"))
 ```
 
 ```{r}
 summary(wells1)$summary[c("beta[1]", "beta[2]", "beta[3]", "beta[4]"),]
 ```
 
-For every unit increase in distance, the odds of switching a well are multiplied by exp(-0.008793405), assuming all other factors are held constant.
+```{r}
+#summary(wells2)$summary[c("beta[1]", "beta[2]", "beta[3]", "beta[4]"),]
+```
 
-For every unit increase in arsenic levels, the odds of switching a well are multiplied by exp(0.467958876), assuming all other factors are held constant.
 
-For every unit increase in demeaned distance multiplied by demeaned arsenic levels, the odds of switching a well are multiplied by exp(-0.001760422), assuming all other factors are held constant.
+
+The odds of switching a well for someone with mean arsenic levels and mean distance is  $\exp(0.350705008) \approx 1.42$. So someone with mean arsenic levels and mean distance is 42% more likely to switch their well.
+
+For every unit increase in distance, the odds of switching a well are multiplied by $\exp(-0.008739881) \approx 0.99$, assuming all other factors are held constant. Since this is close to 1, someone with a unit increase in distance is probably unlikely to switch their well, assuming other factors held constant.
+
+For every unit increase in arsenic levels, the odds of switching a well are multiplied by $\exp(0.469091474) \approx 1.60$, assuming all other factors are held constant. If there is a unit increase in arsenic, someone is 59.8% more likely to switch their well, assuming other factors held constant.
+
+For every unit increase in demeaned distance multiplied by demeaned arsenic levels, the odds of switching a well are multiplied by $exp(-0.001775180) \approx 0.998$, assuming all other factors are held constant. As seen in the previous graph of arsenic against distance, there isn't much correlation. So arsenic and distance together don't have much influence on switching wells.
 
 ## Question 3c
 
 ```{r}
 t_test_stat = function(y,a){
-  yind <- ifelse(y=1 & a<0.82, 1, 0)
-  yind2 <- ifelse(a < 0.82, 1, 0)
-  num = sum(yind)
-  denom = sum(yind2)
+  num = sum(y==1 & a< 0.82)
+  denom = sum(a < 0.82)
   return(num/denom)
 }
 ```
@@ -305,29 +430,30 @@ t_test_stat = function(y,a){
 ```{r}
 yrep1 <- extract(wells1)[["log_switch_rep"]]
 yrep2 <- extract(wells2)[["log_switch_rep"]]
-cent_arsenic <- wells$cent_arsenic
 ```
 
 ```{r}
-teststat = t_test_stat(wells$switch, cent_arsenic)
-teststat_rep <- sapply(1:nrow(yrep1), function(i)t_test_stat(yrep1[i,],cent_arsenic))
-teststat_rep_2 <- sapply(1:nrow(yrep2), function(i) t_test_stat(yrep2[i,],cent_arsenic))
+teststat = t_test_stat(wells$switch, wells$arsenic)
+teststat_rep <- sapply(1:nrow(yrep1), function(i)t_test_stat(yrep1[i,],wells$arsenic))
+teststat_rep_2 <- sapply(1:nrow(yrep2), function(i) t_test_stat(yrep2[i,],wells$arsenic))
 
 ggplot(data = as_tibble(teststat_rep), aes(value)) + 
-    geom_histogram(aes(fill = "replicated")) + 
+    geom_histogram(aes(fill = "replicated"), bins=50) + 
     geom_vline(aes(xintercept = teststat, color = "observed"), lwd = 1.5) + 
   ggtitle("Model 1: test stat") + 
   scale_color_manual(name = "", values = c("observed" = "purple"))+
   scale_fill_manual(name = "", values = c("replicated" = "pink")) + theme_bw()
 
 ggplot(data = as_tibble(teststat_rep_2), aes(value)) + 
-    geom_histogram(aes(fill = "replicated")) + 
+    geom_histogram(aes(fill = "replicated"), bins = 50) + 
     geom_vline(aes(xintercept = teststat, color = "observed"), lwd = 1.5) + 
   ggtitle("Model 2: test stat") + 
   scale_color_manual(name = "", values = c("observed" = "purple"))+
   scale_fill_manual(name = "", values = c("replicated" = "pink")) + theme_bw()
 
 ```
+
+Model 2 was better, because most of the replicated test statistics are closer to the observed test statistic.
 
 ## Question 3d
 
@@ -350,15 +476,51 @@ Model 2 is better because it has a higher elpd_loo.
 ## Question 3e
 
 ```{r}
-loo1_i <- loo1$pointwise[,"elpd_loo"]
-loo2_i <- loo2$pointwise[,"elpd_loo"]
-loo_i_df <- data.frame(loo1_i, loo2_i)
-loo_i_df %>% ggplot(aes(x=loo1_i, y=loo2_i)) + geom_point()
+loo1_i <- loo1$pointwise[,1]
+loo2_i <- loo2$pointwise[,1]
+loo_i_df <- data.frame(loo1_i, loo2_i, y = as.factor(wells$switch))
+loo_i_df %>% ggplot(aes(x=loo1_i, y=loo2_i, color=y)) + geom_point() 
 ```
 ```{r}
-loo_i_df <- data.frame(loo_i_diff = loo2_i - loo1_i, cent_arsenic = wells$cent_arsenic)
-loo_i_df %>% ggplot(aes(x=loo_i_diff, y=cent_arsenic)) + geom_point()
+loo_i_diff <- loo2_i - loo1_i
+loo_i_df <- data.frame(loo_i_diff = loo_i_diff, 
+                       log_arsenic = log(wells$arsenic), 
+                       y=factor(wells$switch))
+loo_i_df %>% ggplot(aes(x=loo_i_diff, y=log_arsenic, color = y)) + geom_point()
 ```
   
-# Question 3f
+If the difference between $ELPD_i$ for model 2 and model 1 is positive, Model 2 is better. Model 2 is better for households who did not switch wells and had extremely high arsenic or extremely low arsenic.  Model 2 is better for households who switched wells and had arsenic level between 0 and 1. 
+  
+## Question 3f
 
+$exp(ELPD_i )$ is the probability of switching wells for house i.
+
+## Question 3g
+
+```{r}
+yi_hat_1 <- exp(loo1_i)
+yi_hat_2 <- exp(loo2_i)
+resid_1 <- wells$switch - yi_hat_1
+resid_2 <- wells$switch - yi_hat_2
+log_arsenic <- log(wells$arsenic)
+log_arsenic_binned <- cut(log_arsenic, breaks = 40)
+arsenic_binned <- cut(wells$arsenic, breaks = 40)
+```
+
+```{r}
+dataframe1 <- data.frame(resid_1, arsenic_binned)
+dataframe1 %>% group_by(arsenic_binned) %>%
+  summarize(mean_resid_ars_group =  mean(resid_1), se_resid_ars_group = sd(resid_1)/sqrt(length(resid_1))) -> newdataframe1
+
+newdataframe1 %>% ggplot(aes(x=arsenic_binned, y=mean_resid_ars_group)) + geom_point() + geom_errorbar(aes(ymin = mean_resid_ars_group - 2*se_resid_ars_group, ymax = mean_resid_ars_group + 2*se_resid_ars_group)) + labs(x="Arsenic level", y="Mean residual by arsenic group")+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
+
+If the mean residual for a certain arsenic level range is close to 0, the model is predicting well. 
+
+```{r}
+dataframe2 <- data.frame(resid_2, log_arsenic_binned)
+dataframe2 %>% group_by(log_arsenic_binned) %>%
+  summarize(mean_resid_logars_group =  mean(resid_2), se_resid_logars_group = sd(resid_2)/sqrt(length(resid_2))) -> newdataframe1
+
+newdataframe1 %>% ggplot(aes(x=log_arsenic_binned, y=mean_resid_logars_group)) + geom_point() + geom_errorbar(aes(ymin = mean_resid_logars_group - 2*se_resid_logars_group, ymax = mean_resid_logars_group + 2*se_resid_logars_group)) + labs(x="Log Arsenic level", y="Mean residual by log arsenic group") + theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+```
