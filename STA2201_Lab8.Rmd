@@ -278,7 +278,7 @@ ggplot(lkavr, aes(year, logit_ratio)) +
   labs(title = "Ratio of neonatal to other child mortality (logged), Sri Lanka", y = "log ratio")
 ```
 
-The VR source is the only one that has the most recent observation in 2014. If we exclude VR, the next most recent observation is from 2005. Since the first order random walk projection depends on the most recent observation, excluding VR will make the projections be based off older observations, and potentially be less accurate. 
+The VR source is the only one that has the most recent observation in 2014. If we exclude VR, the next most recent observation is from 2005. Since the second order random walk projection depends on the most recent observation and second most recent observation, excluding VR will make the projections be based off older observations, and potentially be less accurate. We see that the projected 2023 value is lower if we exclude the VR source.
 
 ## Question 6
 
@@ -322,4 +322,4 @@ ggplot(lkavr, aes(year, logit_ratio)) +
   labs(title = "Ratio of neonatal to other child mortality (logged), Sri Lanka", y = "log ratio")
 ```
 
-I think the second order random walk model is more appropriate for data excluding the VR source. Since the first order random walk projection depends on the most recent observation, excluding VR will make the projections be based off older observations, and potentially be less accurate. 
+I think the second order random walk model is more appropriate for data excluding the VR source. Since the first order random walk projection depends on the most recent observation, excluding VR will make the projections be based off only one observation from 2005. The first order random walk projection assumes the projected values will be similar to the 2005 values. However the second order random walk projection will depend on the observations from 2005 and 2000 so perhaps it captures the trend better. The second order random walk model gives more reasonable point estimates
