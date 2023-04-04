@@ -46,6 +46,7 @@ library(geofacet)
 d %>% ggplot(aes(year, ent_pc)) + geom_line() + facet_geo(~state)
 ```
 
+For most states, foster care entries seemed to have stayed around the same from 2010 - 2016. However for Montana, West Virginia, Alaska, Vermont, there were increases in foster care entries. For the District of Columbia there was a decrease in foster care entries.
 
 ## Question 2
 
@@ -84,7 +85,8 @@ mod <- stan(data = stan_data, file = "lab11.stan")
 
 Project forward entries per capita to 2030. Pick 4 states and plot the results (with 95% CIs). Note the code to do this in R is in the lecture slides. 
 
-```{r}
+```{r, error = TRUE}
+years = 2010:2017
 proj_years <- 2018:2030
 # Note: B.ik are splines for in-sample period
 # has dimensions i (number of years) x k (number of knots)
@@ -98,9 +100,9 @@ alphas <- extract(mod)[["alpha"]]
 sigmas <- extract(mod)[["sigma"]] # sigma_alpha
 sigma_ys <- extract(mod)[["sigma_y"]]
 nsims <- nrow(alphas)
-```
 
-```{r}
+states = c("California", "Mississippi", "Ohio", "Texas")
+
 # first, project the alphas
 alphas_proj <- array(NA, c(nsims, proj_steps, length(states)))
 set.seed(1098)

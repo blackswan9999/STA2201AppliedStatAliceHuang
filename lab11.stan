@@ -11,7 +11,7 @@ data {
 parameters {
   matrix[K,S] alpha;
   vector<lower=0>[S] sigma_alpha;
-  vector<lower=0>[S] sigma;
+  vector<lower=0>[S] sigma_y;
 }
 
 transformed parameters{

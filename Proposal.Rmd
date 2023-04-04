@@ -2,10 +2,190 @@
 title: "Proposal"
 author: "Alice Huang"
 date: "29/03/2023"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE, message= FALSE, warning=FALSE)
 ```
 
+# Data
+
+Since the Industrial Revolution, Carbon Dioxide (CO2) Emissions have been increasing in Europe. High CO2 emissions have been associated with greenhouse gas effects and warming climates. High CO2 emissions and their resulting greenhouse gas effects have significant impacts on wildlife, human respiratory health, natural disasters, crop yields, and more. Thus understanding the impact of different factors associated with CO2 emissions is of great interest to many governments, businesses and individuals. 
+
+In this paper, we propose a Bayesian model for the 2019 Carbon Dioxide (CO2) emissions of European countries. The dataset was taken from Kaggle and originally pulled from the US Energy Commission. The original dataset had CO2 emissions data for world countries from 1980-2019, and stratified by energy type. However, we consider just countries from Europe so that the countries are of more comparable geographical size and population and use similar energy sources. We also combined the emissions from all energy types together for the sake of simplifying the model. We removed Iceland because there was missing data. We removed Russia because it was an extreme outlier in terms of CO2 emissions. We are interested in the influence of the following covariates on the 2019 Carbon Dioxide (CO2) emissions (in MMtonnes) of European countries: 
+- `Energy_consumption`: amount of energy consumed (quad Btu)
+- `Energy_production`: amount of energy produced (quad Btu)
+- `GDP`: nation's purchasing power, measure of economic wealth (Billion 2015$ PPP)
+- `Population`: Number of people in country (Millions) 
+- `Energy_intensity_per_capita`: measure of energy efficiency per unit of GDP (units: 1000 Btu/2015$ GDP PPP) 
+- `Energy intensity_by_GDP`: measure of energy efficiency per person (MMBtu/person)
+
+We centered all the covariates, to reduce correlation between variables.
+
+```{r, include=FALSE}
+library(tidyverse)
+energy <- read.csv("energy.csv")
+data2019 <- energy %>% filter(Year == 2019, Energy_type == "all_energy_types") %>% filter(Country != "World")
+
+europe_countries <- c("Armenia", "Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herzegovina", "Bulgaria", "Croatia", "Cyprus", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany", "Georgia", "Greece", "Hungary", "Iceland", "Ireland", "Italy", "Kosovo", "Latvia", "Liechtenstein", "Lithuania", "Luxembourg", "Malta", "Moldova", "Monaco", "Montenegro", "Netherlands", "North Macedonia", "Norway", "Poland", "Portugal", "Romania", "Russia", "San Marino", "Serbia", "Slovakia", "Slovenia", "Spain", "Sweden", "Switzerland", "Turkey", "Ukraine", "United Kingdom", "Vatican City")
+europe2019 <- data2019 %>% filter(Country %in% europe_countries)
+
+europe2019 %>% filter(Country != "Iceland", Country != "Russia") -> europe2019
+
+# Center variables
+europe2019$Energy_consumption = europe2019$Energy_consumption - mean(europe2019$Energy_consumption, na.rm=TRUE)
+europe2019$Energy_production = europe2019$Energy_production - mean(europe2019$Energy_production, na.rm=TRUE)
+europe2019$GDP = europe2019$GDP - mean(europe2019$GDP, na.rm=TRUE)
+europe2019$Population = europe2019$Population - mean(europe2019$Population, na.rm=TRUE)
+europe2019$Energy_intensity_per_capita = europe2019$Energy_intensity_per_capita - mean(europe2019$Energy_intensity_per_capita, na.rm=TRUE)
+europe2019$Energy_intensity_by_GDP = europe2019$Energy_intensity_by_GDP - mean(europe2019$Energy_intensity_by_GDP, na.rm=TRUE)
+```
+
+## Summary Statistics
+
+Here are the summary statistics of the variables.
+
+```{r}
+library(knitr)
+europe2019 %>% select(Energy_consumption, Energy_production, GDP, Population, Energy_intensity_per_capita, Energy_intensity_by_GDP) -> europe2019filt2
+summary(europe2019filt2) %>% kable()
+```
+
+
+## Plotting the Covariates Against CO2 Emissions
+
+We noted that generally, as energy production increased, CO2 emissions increased. Similarly, as energy consumption increased, CO2 emissions increased. As population increased, CO2 emissions increased. On the other hand, `Energy_intensity_per_capita` and `Energy intensity_by_GDP` did not seem to significantly influence CO2 emissions. 
+
+```{r}
+require(gridExtra)
+plot1 <- europe2019 %>% ggplot(aes(x=Energy_consumption, y=CO2_emission, col=Energy_production)) + geom_point()
+
+plot2 <- europe2019 %>% ggplot(aes(x=Energy_production, y=CO2_emission)) + geom_point() 
+
+plot3 <- europe2019 %>% ggplot(aes(x=Energy_intensity_per_capita, y=CO2_emission, col=Population)) + geom_point() + geom_smooth(method="lm") 
+
+plot4 <- europe2019 %>% ggplot(aes(x=GDP, y=CO2_emission)) + geom_point() 
+
+plot5 <-europe2019 %>% ggplot(aes(x=Energy_intensity_by_GDP, y=CO2_emission, col=GDP)) + geom_point()+ geom_smooth(method="lm") 
+
+plot6 <- europe2019 %>% ggplot(aes(x=Population, y=CO2_emission)) + geom_point()
+
+grid.arrange(plot4, plot6, plot3, plot5, plot1, plot2, ncol=2)
+```
+
+## Checking for Correlation Between Variables
+
+The columns of the correlation matrix correspond to `Energy_consumption`, `Energy_production`, `GDP`, `Population`, `Energy_intensity_per_capita`, `Energy_intensity_by_GDP` from left to right.
+
+```{r}
+m <- as.matrix(cbind(europe2019$Energy_consumption, 
+                     europe2019$Energy_production, 
+                     europe2019$GDP, 
+                     europe2019$Population, 
+                     europe2019$Energy_intensity_per_capita, 
+                     europe2019$Energy_intensity_by_GDP))
+cor(m)
+
+europe2019 %>% select(Energy_consumption, Energy_production, GDP, Population, Energy_intensity_per_capita, Energy_intensity_by_GDP) -> europe2019filt2
+plot(europe2019filt2)
+```
+
+There is strong correlation between the following pairs of covariates:
+
+- `Energy_consumption`, `Energy_production`
+- `Energy_consumption`, `GDP`
+- `Energy_consumption`, `Population`
+- `Energy_production`, `Population`
+- `Energy_production`, `GDP` 
+- `GDP`, `Population`
+
+The correlation between `Energy_consumption`, `GDP` is very close to 1, so we decide to just include `GDP` instead of both variables. Thus we will be interested in the following interactions:
+
+- `Energy_production`, `GDP` 
+- `GDP`, `Population`
+
+```{r eval=FALSE, include=FALSE}
+europe2019 %>% ggplot(aes(x=Population, y=Energy_intensity_per_capita, col=GDP)) + geom_point()
+
+europe2019 %>% ggplot(aes(x=GDP, y=Energy_intensity_by_GDP, col=Population)) + geom_point()
+
+europe2019 %>% ggplot(aes(x=Population, y=GDP)) + geom_point()
+
+europe2019 %>% ggplot(aes(x=Energy_production, y=Energy_consumption, col=Population)) + geom_point()
+```
+
+## Considering What Type of Likelihood Model to Use
+
+We consider a log-linear model. We use the Shapiro-Wilk test to test whether `log(CO2_emission)` is normally distributed. The p-value is 0.1566 > 0.05 so we do not reject the null hypothesis that `log(CO2_emission)` is normally distributed. Thus a log-linear model may be a viable option.
+
+```{r fig.height=3, fig.width=4}
+qqnorm(log(europe2019$CO2_emission))
+qqline(log(europe2019$CO2_emission))
+shapiro.test(log(europe2019$CO2_emission))
+```
+
+## Histograms of Covariates For Determining Appropriate Prior Distributions
+
+We see that the covariates' histograms are all heavily skewed to the right.
+
+```{r fig.height=3}
+require(gridExtra)
+ploti1 <- europe2019 %>% ggplot(aes(x=Energy_production)) + geom_histogram(bins=10)
+
+ploti2 <- europe2019 %>% ggplot(aes(x=Population)) + geom_histogram(bins=10)
+
+ploti3 <- europe2019 %>% ggplot(aes(x=GDP)) + geom_histogram(bins=10)
+grid.arrange(ploti1, ploti2, ploti3,ncol=3)
+```
+
+```{r, eval=FALSE, include=FALSE}
+europe2018 <- energy %>% filter(Year == 2018, Energy_type == "all_energy_types") %>% filter(Country %in% europe_countries) %>% filter(Country != "Iceland", Country != "Russia")
+# Center variables
+europe2018$Energy_consumption = europe2018$Energy_consumption - mean(europe2018$Energy_consumption, na.rm=TRUE)
+europe2018$Energy_production = europe2018$Energy_production - mean(europe2018$Energy_production, na.rm=TRUE)
+europe2018$GDP = europe2018$GDP - mean(europe2018$GDP, na.rm=TRUE)
+europe2018$Population = europe2018$Population - mean(europe2018$Population, na.rm=TRUE)
+europe2018$Energy_intensity_per_capita = europe2018$Energy_intensity_per_capita - mean(europe2018$Energy_intensity_per_capita, na.rm=TRUE)
+europe2018$Energy_intensity_by_GDP = europe2018$Energy_intensity_by_GDP - mean(europe2018$Energy_intensity_by_GDP, na.rm=TRUE)
+sd(log(europe2018$CO2_emission))
+
+europe2018 %>% ggplot(aes(x=Energy_production, y=log(CO2_emission))) + geom_point() + geom_smooth(method= "lm")
+europe2018 %>% ggplot(aes(x=GDP, y=log(CO2_emission))) + geom_point() + geom_smooth(method= "lm")
+europe2018 %>% ggplot(aes(x=Population, y=log(CO2_emission))) + geom_point() + geom_smooth(method= "lm")
+```
+
+We use the 2018 emissions data to help determine what might be reasonable priors for the 2019 data. We come up with estimates for the prior means by plotting the 2018 log CO2 emissions against each covariate and interaction term, in order to estimate the expected change in log CO2 emissions for each unit covariate change. We chose the mean of the prior for the 2019 coefficient to be the slope of the trendline on the 2018 log CO2 emissions against the 2018 coefficient. We put higher variances on the variables that seem to have more variation.
+
+The standard deviation of log CO2 emissions has mean close to 1.5 so we consider a half normal prior with mean 1.5 and choose a standard deviation of 1.  
+
+## Proposed Model
+
+We propose the following model:
+
+$\log(Y_i ) | \mu_i , \sigma^2_i \sim N(\mu_i , \sigma^2_i )$
+
+$\log(\mu_i) = \beta_0 + \beta_1 P_i + \beta_2 E_i + \beta_3 G_i + \beta_4 E_i G_i + \beta_5 G_i P_i$
+
+$\sigma^2 \sim N^+ (1.5, 2)$
+
+$\beta_0 \sim N(0, 10)$
+
+$\beta_1 \sim N(0, 5)$
+
+$\beta_2 \sim N(0.5, 2)$
+
+$\beta_3 \sim N(0.0025, 5)$
+
+$\beta_4 \sim N(0, 4)$
+
+$\beta_5 \sim N(0, 4)$
+
+where $P_i$ is the population of country $i$, $E_i$ is the energy production of country $i$ and $G_i$ is the GDP of country $i$.
+
+Reference:
+
+https://www.kaggle.com/datasets/lobosi/c02-emission-by-countrys-grouth-and-population
