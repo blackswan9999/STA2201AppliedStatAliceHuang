@@ -1,0 +1,157 @@
+---
+title: "Final Project 3"
+author: "Alice Huang"
+date: "04/04/2023"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+
+```{r}
+library(tidyverse)
+library(readxl)
+datamaize <- read_csv("Book2.csv")
+datamaize_readme <- read_xlsx("Dataset instrumetn.xlsx")
+```
+
+
+```{r}
+datamaizechina <- datamaize %>% filter(Region == "China") %>%
+  dplyr::select(Yield, MAP, MAT, Texture, PPH, SOC, Water, Nitrogen)
+```
+
+```{r}
+datamaizechina %>% filter(!is.na(Yield)) -> datamaizechina
+```
+
+```{r}
+datamaizechina["Texture"][datamaizechina["Texture"] == "silty loam"] <- "silt loam"
+datamaizechina["Texture"][datamaizechina["Texture"] == "loamy clay"] <- "clay loam"
+datamaizechina["Texture"][datamaizechina["Texture"] == "slity clay"] <- "clay silt"
+datamaizechina["Texture"][datamaizechina["Texture"] == "heavy loam"] <- "loam"
+```
+
+
+```{r}
+datamaizechina %>% ggplot(aes(x=Water, y=Yield, col=Texture)) + geom_point() + geom_smooth(method="lm", se=FALSE) + theme_bw() + labs(x="Water from irrigation & rainfall (mm)", y="Yield (t/ha)")
+```
+
+```{r}
+datamaizechina %>% ggplot(aes(x=Nitrogen, y=Yield, col=Texture)) + geom_point() + geom_smooth(method="loess", se=FALSE) + labs(x="Nitrogen (kg/ha)", y="Yield (t/ha)") + theme_bw()
+```
+
+For most soil types except silt loam, increasing plant density seemed to increase yield
+Perhaps farmers already knew how dense to plant their seeds before plants start competing with each other
+
+
+```{r}
+datamaizechina %>% ggplot(aes(x=(PPH), y=Yield, col=Texture)) + geom_point() + geom_smooth(method="loess", se=FALSE) + labs(x="Number of Plants Per Hectare", y="Yield (t/ha)") + theme_bw()
+```
+```{r}
+datamaizechina %>% ggplot(aes(x=WP, y=Yield)) + geom_point()
+```
+```{r}
+boxcoxyield <- MASS::boxcox(lm(datamaizechina$Yield ~ 1))
+bestlambda <- boxcoxyield$x[which.max(boxcoxyield$y)]
+```
+
+```{r}
+box <- function(y, lambda){
+  return(((y^lambda)-1)/lambda)
+}
+datamaizechina %>% ggplot(aes(x=(Yield))) + geom_histogram()
+qqnorm((datamaizechina$Yield))
+qqline((datamaizechina$Yield))
+shapiro.test((datamaizechina$Yield))
+```
+```{r}
+datamaizechina %>% ggplot(aes(x=box(Yield,bestlambda))) + geom_histogram() + labs(x="Box-Cox Transformed Maize Yield") + theme_bw()
+qqnorm(box(datamaizechina$Yield, bestlambda))
+qqline(box(datamaizechina$Yield, bestlambda))
+shapiro.test(box(datamaizechina$Yield, bestlambda))
+```
+
+```{r}
+datamaizechina %>% ggplot(aes(x=MAP, y=Yield)) + geom_point() + geom_smooth() + labs(x="Mean annual precipitation (mm)", y="Yield (t/ha)")
+```
+
+```{r}
+datamaizechina %>% ggplot(aes(x=MAT, y=Yield, col=Texture)) + geom_point() + geom_smooth(method="lm", se=FALSE) +labs(x="Mean annual temperature (degrees Celcius)", y="Yield (t/ha)") + theme_bw()
+```
+
+```{r}
+datamaizechina %>% ggplot(aes(x=Texture, y=MAT)) + geom_boxplot()
+```
+
+
+```{r}
+datamaizechina %>% ggplot(aes(x=Texture, y=Yield)) + geom_boxplot() + theme_bw() + labs(x= "Soil Texture", y="Yield (t/ha)")
+```
+
+```{r}
+datamaizechina %>% ggplot(aes(x=SOC, y=Yield, col=Nitrogen)) + geom_point() + labs(x="Initial Soil Organic Carbon", y="Yield (t/ha)") + geom_smooth() + theme_bw()
+```
+
+
+```{r}
+datamaizechina %>% ggplot(aes(x=SOC, y=Nitrogen)) + geom_point() + labs(x="Initial Soil Organic Carbon", y="Nitrogen level (kg/ha)") + geom_smooth() + theme_bw()
+```
+
+$y_j$
+
+
+```{r}
+soil_vars <- datamaizechina %>% group_by(Texture) %>% summarize(var_by_soil = var(Yield))
+soil_vars
+```
+
+```{r}
+cor(datamaizechina$Water, datamaizechina$Nitrogen)
+plot(datamaizechina$Water, datamaizechina$PPH)
+plot(datamaizechina$Nitrogen, datamaizechina$PPH)
+```
+
+$$y_{j} | \alpha_{j[i]}, \beta_{j[i]}, \gamma_{j[i]}, \sigma^2_y \sim N(\alpha_{j[i]} + \beta_{j[i]}W_i + \gamma_{j[i]}N_i , \sigma^2_y )$$
+\begin{center}
+$y_j$ is transformed maize yield (t/ha), $W_i$ is water (mm), $N_i$ is nitrogen (kg/ha)
+\end{center}
+$$\sigma^2_y \sim N(0,1)$$
+$$\alpha_j \sim N(\mu_{\alpha}, \sigma^2_{\alpha})$$
+$$\mu_{\alpha} \sim N(0,1)$$
+$$\sigma^2_{\alpha} \sim N(0,1)$$
+$$\beta_j \sim N(\mu_{\beta}, \sigma^2_{\beta})$$
+$$\mu_{\beta} \sim N(0,1)$$
+$$\sigma^2_{\beta} \sim N(0,1)$$
+$$\gamma_j \sim N(\mu_{\gamma}, \sigma^2_{\gamma})$$
+$$\mu_{\gamma} \sim N(0,1)$$
+$$\sigma^2_{\gamma} \sim N(0,1)$$
+
+```{r}
+datamaize %>% filter(Region == "China") -> datachina2
+
+datachina2 %>% dplyr::select(references) %>% unique()
+datachina2 %>% dplyr::select(location) %>% unique()
+```
+```{r}
+library(knitr)
+datamaizechina %>% dplyr::select(-MAP, -Texture) %>% summary() %>% kable()
+```
+
+```{r}
+library(ggrepel)
+datamaizechina %>% group_by(Texture) %>%
+  summarize(prop = n()/nrow(datamaizechina)) -> dfpie
+dfpie %>%  ggplot(aes(x="", y= prop, fill = Texture)) +
+  geom_col() + 
+  coord_polar(theta = "y") + theme_bw() +
+  scale_fill_brewer(palette = "Pastel1") +
+  geom_label_repel(data = dfpie,
+                   aes(y = prop, label = paste0(prop*100, "%")),
+                   size = 4.5, position = position_stack(vjust=0.5), show.legend = FALSE) +
+  guides(fill = guide_legend(title = "Soil Texture"))
+
+# geom_text(aes(label = prop), position = position_stack(vjust=0.5)) +
+```
+

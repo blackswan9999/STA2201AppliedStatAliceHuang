@@ -29,6 +29,115 @@ cropdata %>% filter(Crop_Type == "Maize") %>% group_by(Dataset) %>% summarize(co
 ```
 
 ```{r}
-cropdata %>% filter(Crop_Type =="Maize", Dataset == "Kihara_et al. 2017_Micronutrients dataset") %>% group_by(`Site ID`) %>% summarise(count = n())
+maizedata <- cropdata %>% filter(Crop_Type =="Maize"|Crop_Type =="maize")
 ```
+
+```{r}
+maizedatacent = maizedata
+maizedatacent %>% dplyr::select(Abs_Class, Var_Type, N, `P...9`, K, Lat, Lon, BCR, pH, SOC, `P...28`, Clay, ECEC, SoilType, Rainfall, CEC_15_ISRIC, CEC_30_ISRIC, Clay_15_ISRIC, Clay_30_ISRIC, SOC_15_ISRIC, SOC_30_ISRIC, Sand_15_ISRIC, Sand_30_ISRIC) -> maizedatacent
+```
+```{r}
+colSums(is.na(maizedatacent))
+```
+
+```{r}
+maizedatacent %>% filter(!is.na(Abs_Class)) -> maizedatacent
+```
+
+
+```{r}
+#maizedatacent$Abs_Class = (maizedatacent$Abs_Class - mean(maizedatacent$Abs_Class, na.rm=TRUE))
+
+maizedatacent$N = (maizedatacent$N - mean(maizedatacent$N, na.rm=TRUE))
+
+maizedatacent$K = (maizedatacent$K - mean(maizedatacent$K, na.rm=TRUE))
+maizedatacent$Lat = as.numeric(maizedatacent$Lat)
+maizedatacent$Lon = as.numeric(maizedatacent$Lon)
+#maizedatacent$Lat = (maizedatacent$Lat - mean(maizedatacent$Lat, na.rm=TRUE))
+#maizedatacent$Lon = (maizedatacent$Lon - mean(maizedatacent$Lon, na.rm=TRUE))
+maizedatacent$BCR = (maizedatacent$BCR - mean(maizedatacent$BCR, na.rm=TRUE))
+maizedatacent$pH = (maizedatacent$pH - mean(maizedatacent$pH, na.rm=TRUE))
+maizedatacent$SOC = (maizedatacent$SOC - mean(maizedatacent$SOC, na.rm=TRUE))
+
+maizedatacent$Clay = (maizedatacent$Clay - mean(maizedatacent$Clay, na.rm=TRUE))
+maizedatacent$ECEC = (maizedatacent$ECEC - mean(maizedatacent$ECEC, na.rm=TRUE))
+maizedatacent$Rainfall = (maizedatacent$Rainfall - mean(maizedatacent$Rainfall, na.rm=TRUE))
+maizedatacent$CEC_15_ISRIC = (maizedatacent$CEC_15_ISRIC - mean(maizedatacent$CEC_15_ISRIC, na.rm=TRUE))
+maizedatacent$CEC_30_ISRIC = (maizedatacent$CEC_30_ISRIC - mean(maizedatacent$CEC_30_ISRIC, na.rm=TRUE))
+maizedatacent$Clay_15_ISRIC = (maizedatacent$Clay_15_ISRIC - mean(maizedatacent$Clay_15_ISRIC, na.rm=TRUE))
+maizedatacent$Clay_30_ISRIC = (maizedatacent$Clay_30_ISRIC - mean(maizedatacent$Clay_30_ISRIC, na.rm=TRUE))
+maizedatacent$SOC_15_ISRIC = (maizedatacent$SOC_15_ISRIC - mean(maizedatacent$SOC_15_ISRIC, na.rm=TRUE))
+maizedatacent$SOC_30_ISRIC = (maizedatacent$SOC_30_ISRIC - mean(maizedatacent$SOC_30_ISRIC, na.rm=TRUE))
+maizedatacent$Sand_15_ISRIC = (maizedatacent$Sand_15_ISRIC - mean(maizedatacent$Sand_15_ISRIC, na.rm=TRUE))
+maizedatacent$Sand_30_ISRIC = (maizedatacent$Sand_30_ISRIC - mean(maizedatacent$Sand_30_ISRIC, na.rm=TRUE))
+```
+
+
+```{r}
+MASS::boxcox(lm(maizedatacent$Abs_Class ~ 1))
+```
+```{r}
+class_yield_t <- sqrt(maizedatacent$Abs_Class)
+qqnorm(class_yield_t)
+qqline(class_yield_t)
+shapiro.test(class_yield_t)
+```
+```{r}
+maizedatacent$Var_Type = toupper(maizedatacent$Var_Type)
+maizedatacent %>% group_by(Var_Type) %>% summarize(count = n())
+maizedatacent %>% ggplot(aes(x=Var_Type, y=Abs_Class)) + geom_boxplot()
+```
+
+```{r}
+maizedatacent %>% ggplot(aes(x=factor(N), y=Abs_Class)) + geom_boxplot()
+```
+
+
+```{r}
+maizedatacent2 <- maizedatacent %>% filter(Var_Type == "MAIZE")
+maizedatacent2$Abs_Class = sqrt(maizedatacent2$Abs_Class)
+```
+
+```{r}
+#maizedatacent2 %>% ggplot(aes(x= factor(Var_Type), y = Abs_Class)) + geom_boxplot()
+maizedatacent2 %>% ggplot(aes(x= factor(N), y = Abs_Class)) + geom_boxplot()
+maizedatacent2 %>% ggplot(aes(x=factor(`P...9`), y=Abs_Class)) + geom_boxplot()
+#maizedatacent2 %>% ggplot(aes(x=Lon, y=Abs_Class)) + geom_point()
+#maizedatacent2 %>% ggplot(aes(x=Lat, y=Abs_Class)) + geom_point()
+maizedatacent2 %>% ggplot(aes(x=BCR, y=Abs_Class)) + geom_point() + geom_smooth(method="loess")
+maizedatacent2 %>% ggplot(aes(x=pH, y=Abs_Class)) + geom_point() + geom_smooth(method="loess")
+maizedatacent2 %>% ggplot(aes(x=SOC, y=Abs_Class)) + geom_point() + geom_smooth(method="loess")
+maizedatacent2 %>% ggplot(aes(x=`P...28`, y=Abs_Class)) + geom_point() + geom_smooth(method="loess")
+maizedatacent2 %>% ggplot(aes(x=Clay, y=Abs_Class)) + geom_point() + geom_smooth(method="loess")
+maizedatacent2 %>% ggplot(aes(x=ECEC, y=Abs_Class)) + geom_point() + geom_smooth(method="loess")
+# maizedatacent2 %>% ggplot(aes(x=SoilType, y=Abs_Class)) + geom_boxplot()
+maizedatacent2 %>% ggplot(aes(x=Rainfall, y=Abs_Class)) + geom_point() + geom_smooth(method="loess")
+```
+```{r}
+maizedatacent2 %>% ggplot(aes(x=CEC_15_ISRIC, y=Abs_Class)) + geom_point()
+maizedatacent2 %>% ggplot(aes(x=CEC_30_ISRIC, y=Abs_Class)) + geom_point()
+maizedatacent2 %>% ggplot(aes(x=Clay_15_ISRIC, y=Abs_Class)) + geom_point()
+maizedatacent2 %>% ggplot(aes(x=Clay_30_ISRIC, y=Abs_Class)) + geom_point()
+maizedatacent2 %>% ggplot(aes(x=SOC_15_ISRIC, y=Abs_Class)) + geom_point()
+maizedatacent2 %>% ggplot(aes(x=SOC_30_ISRIC, y=Abs_Class)) + geom_point()
+maizedatacent2 %>% ggplot(aes(x=Sand_15_ISRIC, y=Abs_Class)) + geom_point()
+maizedatacent2 %>% ggplot(aes(x=Sand_30_ISRIC, y=Abs_Class)) + geom_point()
+```
+
+```{r}
+maizedatacent %>% select(-Abs_Class) %>% as.matrix() -> maizematrix
+cor(maizematrix)
+```
+
+```{r}
+maizedatacent %>% ggplot(aes(x=(Abs_Class))) + geom_histogram(bins=20)
+```
+
+```{r}
+qqnorm((maizedata$Abs_Class))
+qqline((maizedata$Abs_Class))
+shapiro.test(((maizedata$Abs_Class)))
+```
+
+
 
