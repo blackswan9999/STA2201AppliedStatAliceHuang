@@ -1,0 +1,8 @@
+---
+title: "Untitled"
+author: "Alice Huang"
+date: "19/04/2023"
+output: html_document
+---
+
+![Soil Types](./soiltriangle_large.jpg){width=250}
