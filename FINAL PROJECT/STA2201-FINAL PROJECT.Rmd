@@ -1,0 +1,460 @@
+---
+title: "A Bayesian Hierarchial Model for Maize Yield"
+author: "Alice Huang"
+date: "04/04/2023"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+abstract: We investigate the effects of water and nitrogen levels on maize yields
+  across different soil types in China. We fit a Bayesian hierarchical model with
+  a Normal likelihood on maize yield, grouping by soil type and investigating the
+  effects of water and nitrogen within each soil type. We show that increasing water
+  and nitrogen results in greater increases in maize yields for coarser soil types
+  that are worse at retaining water and nutrients.
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning=FALSE)
+```
+```{r include=FALSE}
+library(bayesplot) 
+library(loo) 
+library(tidybayes) 
+library(tidyverse)
+library(readxl)
+library(knitr)
+library(rstan)
+```
+
+
+# Introduction
+
+Maize, also known as corn in North America, is one of the most commonly consumed crops in the world. It is used to manufacture many different products including animal feed, cornstarch, and corn syrup. Maize yield influences the supply chain and production of many different food products. Maize yield will have significant implications for food security, and business profitability. In this paper, we build a Bayesian hierarchical model on maize yield, with soil type being a level in the hierarchy, and water level and nitrogen level being the main covariates of interest. We are interested in determining how changes in the water level and nitrogen level affect maize yield in different soil types.  
+
+# Data
+
+The data were downloaded from Data Mendeley at https://data.mendeley.com/datasets/7m3pjrz52x . 
+It is a collection of data from many different studies on maize yield, and was originally featured in a paper by Li et al (2019). In this project, we focus on maize yield data from China, in order to control for correlation due to country’s agriculture laws & policies, farming techniques, and technology. Since China is a large country spanning many different types of geographic regions, there was more data available for comparing different soil types. China is one of the biggest producers of maize in the world, so the findings will be significant for global food production.
+
+The data contained measurements of maize yield (tonnes/hectare), water level from both irrigation and rainfall (mm), soil texture, mean annual temperature (degrees Celcius), nitrogen level (kg/hectare), density (plants per hectare), and soil organic content.
+
+There are different types of soil made of varying percentages of sand, silt, and clay. Sand has the largest particle size, followed by silt, and then clay. Sand is the worst at retaining water, followed by silt, then clay. Maize has shallow roots so it is unable to dig deep into the ground to absorb nutrients. Thus the soil's ability to hold onto water and nutrients is especially important for maize growth. See the Appendix for a soil diagram on the different types of soil as classified by their compositions of sand, silt, clay.
+
+## Missing Data
+
+First we removed observations with missing values for maize yield. There were 80 observations missing Soil Texture type. We intend to build a Bayesian hierarchical model with soil being a level in the hierarchy. We removed rows with missing Soil Texture from the dataset, as there was no way to categorize their soil type and determine how soil interacts with water and other nutrients.
+
+Some soil types were missing lots of data on Plants Per Hectare (PPH), and did not have a lot of observations to begin with. PPH seems to have been kept fairly constant in other soil groups. Perhaps there were industry conventions for how close plants should be planted in the regions corresponding to those soil groups. Or the researchers kept PPH constant since they were interested in studying other factors. Thus PPH may not be particularly useful as a covariate in a model. 
+
+Soil Organic Content (SOC) was missing 168 observations, but there didn't seem to be much correlation between SOC and maize yield, so we ended up not including SOC in the model anyway.
+
+After removing all missing data, there were 709 observations remaining from 52 studies done on 39 locations in China.
+
+```{r}
+# read in dataset
+datamaize <- read_csv("https://raw.githubusercontent.com/blackswan9999/STA2201AppliedStatAliceHuang/main/Book2.csv")
+datamaize_readme <- read_xlsx("Dataset instrumetn.xlsx")
+
+# get only observations in China, select variables we're interested in
+datamaizechina <- datamaize %>% filter(Region == "China") %>%
+  dplyr::select(Yield, MAT, Texture, PPH, SOC, Water, Nitrogen)
+
+# filter out rows with missing Yield
+datamaizechina %>% filter(!is.na(Yield)) -> datamaizechina
+
+# make sure text entries for soil types are consistent
+datamaizechina["Texture"][datamaizechina["Texture"] == "silty loam"] <- "silt loam"
+datamaizechina["Texture"][datamaizechina["Texture"] == "loamy clay"] <- "clay loam"
+datamaizechina["Texture"][datamaizechina["Texture"] == "slity clay"] <- "clay silt"
+datamaizechina["Texture"][datamaizechina["Texture"] == "heavy loam"] <- "loam"
+
+# filter out rows with missing soil information
+datamaizechina %>% filter(!is.na(Texture)) -> datamaizechina
+```
+
+## Summary Statistics
+
+The median yield was 8.6 t/ha and mean yield was 8.857 t/ha, thus indicating that the distribution of the yield skewed slightly to the right.
+
+```{r}
+datamaizechina %>% dplyr::select(-Texture) %>% summary() %>% kable()
+```
+
+We see that there is less data available for the clay and sandy soil texture types. This is to be expected since clay soil represents the finest possible soil and sandy soil is the coarsest possible soil. It is rare to observe such extreme soil types in nature that are suitable for agriculture. Growing maize in clay loam, loam, sandy loam, and silt loam appears to be more common.
+
+```{r fig.height=2.75, fig.width=4}
+library(ggrepel)
+# create dataframe with proportions of soil types in dataset
+datamaizechina %>% group_by(Texture) %>%
+  summarize(prop = n()/nrow(datamaizechina)) -> dfpie
+# make a pie chart for proportions of soil types in dataset
+dfpie %>%  ggplot(aes(x="", y= prop, fill = Texture)) +
+  geom_col() + 
+  coord_polar(theta = "y") + theme_bw() +
+  scale_fill_brewer(palette = "Pastel1") +
+  geom_label_repel(data = dfpie,
+                   aes(y = prop, label = paste0(round(prop*100, digits = 2), "%")),
+                   size = 3, position = position_stack(vjust=0.5), show.legend = FALSE) +
+  guides(fill = guide_legend(title = "Soil Texture"))
+```
+
+## Relationships Between Covariates and Maize Yield
+
+From the following boxplot, we see that clay silt soil seems to have the greatest median yield. However, this finding should be taken with caution since it is only based on 8 data points. There seems to be a lot of variation in yields between different soil types. For example, we note that the variance of maize yield in the sandy and sandy loam groups seems to be larger than the variance of maize yield in the clay loam soil group. Thus soil type seems to be a significant factor influencing maize yield.
+
+```{r fig.height=2.5, fig.width=4.5}
+datamaizechina %>% ggplot(aes(x=Texture, y=Yield)) + geom_boxplot() + theme_bw() + labs(x= "Soil Texture", y="Yield (t/ha)")
+```
+
+We see that water and soil type jointly influence maize growth. For finer soil types like clay and clay loam, increasing water seemed to either have little effect or slightly negative effect on yield. It is possible that finer soil types retain too much water. Thus when farmers give maize plants in finer soil types more water, after a certain point, they may be overwatering the maize plants. Conversely, for coarser soil types like sandy and sandy loam, increasing water seemed to increase yield. Since coarser soil types are worse at retaining water, increasing water through irrigation may compensate for the soil's decreased ability to retain water, and is thus beneficial for plant growth. However, many areas with sandy soil may also have less rainfall, so it may be more expensive to irrigate plants grown in such areas, in order to reach desired maize yields. 
+
+For clay silt soil, there were only 8 observations, and the 8 observations only had 2 unique values of water level: 487 mm and 496 mm. We did not believe there was enough data and variation within data to do any meaningful modeling on yield based on water level for the clay silt soil group. The MCMC chains for the coefficients corresponding to clay silt soil sometimes had issues with convergence. So we removed the 8 observations on clay silt soil from consideration. 
+
+```{r}
+datamaizechina <- datamaizechina %>% filter(Texture %in% c("clay", "clay loam", "loam", "sandy", "sandy loam", "silt loam"))
+```
+```{r fig.height=3, fig.width=5}
+#require(gridExtra)
+
+plot_water <- datamaizechina %>% ggplot(aes(x=Water, y=Yield, col=Texture)) + geom_point() + geom_smooth(method="lm", se=FALSE) + theme_bw() + labs(x="Water from irrigation & rainfall (mm)", y="Yield (t/ha)")
+
+plot_n <- datamaizechina %>% ggplot(aes(x=Nitrogen, y=Yield, col=Texture)) + geom_point() + geom_smooth(method="loess", se=FALSE) + labs(x="Nitrogen (kg/ha)", y="Yield (t/ha)") + theme_bw()
+
+#grid.arrange(plot_water, plot_n, ncol=2)
+plot_water
+```
+
+Previous research (Li et al, 2019) suggests that water and Nitrogen are the main factors that influence plant growth. Nitrogen may come from fertilizer added by farmers or it may occur naturally in the soil. It is believed that major improvements in the production of nitrogen-based fertilizers have greatly contributed towards increased crop production over the past century.
+
+For most soil types, as nitrogen increases, yield either doesn’t change much, or increases slightly but plateaus after (e.g. loam, clay loam). Perhaps for these soil types, the maize yield was limited by the maize plants' ability to absorb nitrogen. The exception seems to be sandy soil, the coarsest type of soil which does not hold onto water and nutrients well. Increasing Nitrogen levels in sandy soil seemed to increase yields at a higher rate, compared to other types of soil.
+
+```{r fig.height=3, fig.width=5}
+plot_n
+```
+
+Increasing temperature seemed to have a slight negative effect on yield. Perhaps warmer climates have longer growing seasons, so the soil is more depleted of nutrients during the year. Temperature and soil texture seemed to be correlated due to geographic region. For certain soil types, like sandy loam, there was very little variance in temperature. For some soil types like clay and sandy, there was little variance in temperature since there were few data points to begin with. Mean annual temperature may not be the best measure of temperature to consider since it includes temperatures throughout the entire year, not just temperatures during growing season. That is why many of the mean annual temperatures recorded in the dataset are lower than one would expect. However, it is difficult to find data on growing season temperatures. Since we intended to stratify based on soil, we decided not to include temperature in the model.
+
+```{r fig.height=2.5, fig.width=5}
+#require(gridExtra)
+plot_temp0 <- datamaizechina %>% ggplot(aes(x=MAT, y=Yield, col=Texture)) + geom_point() + geom_smooth(method="lm", se=FALSE) +labs(x="Mean annual temperature (degrees Celcius)", y="Yield (t/ha)") + theme_bw()
+
+plot_temp <- datamaizechina %>% ggplot(aes(x=Texture, y=MAT)) + geom_boxplot()
+#grid.arrange(plot_temp0, plot_temp, ncol = 2)
+plot_temp0
+```
+
+```{r fig.height=3, fig.width=5}
+plot_temp
+```
+
+## Determining Appropriate Likelihood for Maize Yield
+
+Maize yield is a continuous variable, and its histogram seems to be fairly symmetric and bell-shaped for the soil types which occupy larger proportions of data. However, the tails seemed to be too large for a normal distribution, so we tried transforming the maize yield so we could use a normal distribution to model it for simplicity. We tried fitting Bayesian hierarchical models on log(maize yield) and maize yield without transformation, however the posterior checks seemed to show worse results than the maize yield under Box Cox transformation. The replicated log maize yields would be far from the observed log maize yields. The other models would give divergent transitions, and sometimes low Bulk Effective Sample Sizes, thus indicating that the posterior means and median estimates could be unreliable. Thus, it seemed that a normal likelihood on maize yield under Box Cox transformation was the best option available.
+
+```{r fig.height=2, fig.width=6.5}
+par(mfrow=c(1,3))
+box <- function(y, lambda){
+  return(((y^lambda)-1)/lambda)
+}
+#datamaizechina %>% ggplot(aes(x=(Yield))) + geom_histogram()
+hist(datamaizechina$Yield, xlab="Yield", main="Histogram of Yield")
+qqnorm((datamaizechina$Yield))
+qqline((datamaizechina$Yield))
+#shapiro.test((datamaizechina$Yield))
+boxcoxyield <- MASS::boxcox(lm(datamaizechina$Yield ~ 1))
+bestlambda <- boxcoxyield$x[which.max(boxcoxyield$y)]
+```
+
+The untransformed yield for loam and sandy loam seemed to have a somewhat symmetric bellshaped distribution. For the clay and sandy soil types, there were a low number of observations, so it couldn't be normally distributed. The yield of maize plants grown in clay loam was skewed right. The yield of maize plants grown in silt loam was skewed left.
+
+```{r fig.height=3, fig.width=6}
+datamaizechina %>% ggplot(aes(x=Yield)) + geom_histogram() + facet_wrap(Texture ~ .)
+```
+
+Upon applying the Box Cox transformation to the maize yield (with $\lambda \approx 0.626$), the points on the normal quantile-quantile plot seemed to more closely follow a straight line. However, the tails of the histogram still seemed to be too large, and the Shapiro-Wilk test still indicated evidence against normality.
+
+```{r fig.height=3, fig.width=6}
+par(mfrow=c(1,2))
+#datamaizechina %>% ggplot(aes(x=box(Yield,bestlambda))) + geom_histogram() + labs(x="Box-Cox Transformed Maize Yield") + theme_bw()
+hist(box(datamaizechina$Yield,bestlambda), xlab="Box-Cox Transformed Maize Yield", main="Histogram of Box-Cox \n Transformed Maize Yield")
+qqnorm(box(datamaizechina$Yield, bestlambda))
+qqline(box(datamaizechina$Yield, bestlambda))
+#shapiro.test(box(datamaizechina$Yield, bestlambda))
+```
+
+Upon applying the Box Cox transformation to the maize yield, the yield for clay loam and sandy soil types seemed to become more symmetric. 
+
+```{r fig.height=2.5, fig.width=6}
+datamaizechina %>% ggplot(aes(x=box(Yield, bestlambda))) + geom_histogram() + facet_wrap(Texture ~ .) + labs(x="Maize Yield under Box Cox Transformation")
+```
+
+# Methods
+
+We fit a Bayesian hierarchical model on the transformed maize yield, grouping by soil texture. Within each soil type, we consider the effects of water and nitrogen levels on maize yield. Previous research and data analysis seems to suggest that water and nitrogen are the main factors that influence maize yield. We stratify on soil type because the maize plants' ability to absorb water and nutrients seems to vary across soil types. Soil also seems to be correlated with temperature, geographic region, and planting density. Due to lack of prior information, we place uninformative standard normal priors on the coefficients, and half normal priors on the variances. We center water and nitrogen for stability. We validate the model using two different posterior predictive checks. The first involves comparing the densities of maize yields simulated under the model with the density of the observed maize yield. The second involves comparing median maize yields simulated under the model with the observed median maize yield.
+
+The model is given as follows:
+
+$$y_{j} | \alpha_{j[i]}, \beta_{j[i]}, \gamma_{j[i]}, \sigma^2_y \sim N(\alpha_{j[i]} + \beta_{j[i]}N_i + \gamma_{j[i]}W_i , \sigma^2_y )$$
+$$\sigma^2_y \sim N^+ (0,1)$$
+$$\alpha_j \sim N(\mu_{\alpha}, \sigma^2_{\alpha}) \hspace{1 cm} \mu_{\alpha} \sim N(0,1) \hspace{1 cm} \sigma^2_{\alpha} \sim N^+ (0,1)$$
+$$\beta_j \sim N(\mu_{\beta}, \sigma^2_{\beta}) \hspace{1 cm} \mu_{\beta} \sim N(0,1)\hspace{1 cm} \sigma^2_{\beta} \sim N^+ (0,1)$$
+$$\gamma_j \sim N(\mu_{\gamma}, \sigma^2_{\gamma})\hspace{1 cm} \mu_{\gamma} \sim N(0,1)\hspace{1 cm} \sigma^2_{\gamma} \sim N^+ (0,1)$$
+\begin{center}
+where $y_j$ is the transformed maize yield (t/ha), $W_i$ is water (mm), $N_i$ is nitrogen (kg/ha), $j[i]$ corresponds to the soil texture $j$ for observation $i$
+\end{center}
+
+# Results
+
+```{r}
+datamaizechina0 <- datamaizechina %>% filter(Nitrogen > 0)
+datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("clay loam", "loam", "silt loam", "sandy loam"))
+```
+
+```{r include=FALSE}
+maize <- box(datamaizechina$Yield,bestlambda)
+#maize <- log(datamaizechina$Yield)
+#maize <- (datamaizechina$Yield)
+water <- datamaizechina$Water - mean(datamaizechina$Water)
+nitrogen <- datamaizechina$Nitrogen - mean(datamaizechina$Nitrogen)
+#water <- datamaizechina$Water
+#nitrogen <- datamaizechina$Nitrogen 
+N <- nrow(datamaizechina)
+J <- length(unique(datamaizechina$Texture))
+soil <- as.numeric(as.factor(datamaizechina$Texture))
+
+stan_data <- list(N = N, maize = maize, nitrogen = nitrogen, water = water, J = J, soil = soil)
+mod <- stan(data = stan_data, file = "maize.stan", seed = 777)
+```
+
+We fit the model in Stan and note that the MCMC chains mix for each of the coefficients. We also see that the distributions for the intercepts and coefficients in each soil type generated by each chain are similar. Thus the model converges. Here, the coefficients 1-6 respectively correspond to clay, clay loam, loam, sandy, sandy loam and silt loam.
+
+```{r fig.height=3.5}
+traceplot(mod, pars = c("alpha[1]", "alpha[2]", "alpha[3]", "alpha[4]", "alpha[5]", "alpha[6]",
+                        "beta[1]", "beta[2]", "beta[3]", "beta[4]", "beta[5]", "beta[6]", 
+                        "gamma[1]", "gamma[2]", "gamma[3]", "gamma[4]", "gamma[5]", "gamma[6]"))
+
+stan_dens(mod, separate_chains = TRUE, pars = c("alpha[1]", "alpha[2]", "alpha[3]", "alpha[4]", "alpha[5]", "alpha[6]",
+                        "beta[1]", "beta[2]", "beta[3]", "beta[4]", "beta[5]", "beta[6]", 
+                        "gamma[1]", "gamma[2]", "gamma[3]", "gamma[4]", "gamma[5]", "gamma[6]"))
+```
+
+We compare the densities of 100 sampled yields to the actual yield. The densities of the sampled datasets based on the model were far from the true data. Unfortunately the density of the observed maize yield did not fall entirely within the densities of the replicated maize yields. The model puts too much weight on values in the range 4-5, and not enough weight on values in the tails of the original yield's distribution. The observed median yield and replicated median yields were quite close to each other, however. Upon fitting the model on the data for each of the soil types separately, it seemed that the sampled yields and actual yield were closer for the sandy loam and silt loam soil types. However, the model's posterior predictive checks seemed to be worse for loam and clay loam. For each of the soil types, the replicated medians were close to the true median. See Appendix for the posterior checks by soil type.
+
+```{r fig.height=2, fig.width=6}
+require(gridExtra)
+set.seed(777)
+y <- maize
+# extract simulated maize yield estimates under model
+yrep1 <- extract(mod)[["y_hat"]]
+# randomly sample 100 of those estimates
+samp100 <- sample(nrow(yrep1), 100)
+# plot the 100 maize yield estimates' densities 
+# along with the observed maize yield estimate's density  
+plot_ys <- ppc_dens_overlay(y, yrep1[samp100, ])
+# plot the simulated median maize estimates
+# along with the observed median maize yield from dataset
+plot_meds <- ppc_stat(y, yrep1, stat = 'median')
+# arrange two graphs side by side
+grid.arrange(plot_ys, plot_meds, ncol=2)
+```
+
+Here is the summary of the model coefficients, after reversing the transformation on yield estimates and Confidence interval endpoints so that unit increases in coefficients would result in the tabulated changes in yield.
+
+```{r}
+summary(mod)[["summary"]][c("alpha[1]", "alpha[2]", "alpha[3]", "alpha[4]", "alpha[5]", "alpha[6]", 
+                        "beta[1]", "beta[2]", "beta[3]", "beta[4]", "beta[5]", "beta[6]", 
+                        "gamma[1]", "gamma[2]", "gamma[3]", "gamma[4]", "gamma[5]", "gamma[6]"), c("mean", "se_mean", "sd", "2.5%", "50%", "97.5%", "n_eff", "Rhat")] -> coeff_table
+coeff_table = as.tibble(coeff_table)
+
+unbox <- function(boxyield, lambda){
+  res <- (lambda*boxyield + 1)^(1/lambda)
+  return(res)
+}
+soil_names <- rep(sort(unique(datamaizechina$Texture)),3)
+coef <-  c("alpha[1]", "alpha[2]", "alpha[3]", "alpha[4]", "alpha[5]", "alpha[6]", 
+                        "beta[1]", "beta[2]", "beta[3]", "beta[4]", "beta[5]", "beta[6]", 
+                        "gamma[1]", "gamma[2]", "gamma[3]", "gamma[4]", "gamma[5]", "gamma[6]")
+
+mean = round(unbox(coeff_table$mean, bestlambda), digits = 5)
+se_mean = round(coeff_table$se_mean, digits = 6)
+lower95ci = round(unbox(coeff_table$`2.5%`, bestlambda), digits = 5)
+upper95ci = round(unbox(coeff_table$`97.5%`, bestlambda), digits = 5)
+
+(cbind(soil_names, coef, mean, se_mean, lower95ci, upper95ci)) -> trans_coeff_table
+
+colnames(trans_coeff_table) = c("soil", "coefficients", "mean", "se mean", "Lower 95% CI", "Upper 95% CI")
+
+trans_coeff_table %>% kable()
+```
+
+For clay soil, increasing the water by 1 mm was expected to increase maize yield by 1.00163 tonnes/hectare (CI = (0.99865, 1.00399)). Increasing the nitrogen level by 1 kg/ha was expected to increase the maize yield by 0.99664 tonnes/hectare (CI = (0.98661, 1.00496)).
+
+For clay loam soil, increasing the water by 1 mm was expected to increase maize yield by 1.00289 tonnes/hectare (CI = (1.00149, 1.00431)). Increasing the nitrogen level by 1 kg/ha was expected to increase the maize yield by 0.99794  tonnes/hectare(CI = (0.99672, 0.99911)).
+
+For loam soil, increasing the water by 1 mm was expected to increase maize yield by 1.00296 tonnes/hectare (CI = (1.00187, 1.00409)). Increasing the nitrogen level by 1 kg/ha was expected to increase the maize yield by 1.00083 tonnes/hectare (CI = (0.99968, 1.00193)).
+
+For sandy soil, increasing the water by 1 mm was expected to increase maize yield by 1.00378 tonnes/hectare (CI = (1.00207, 1.00563)). Increasing the nitrogen level by 1 kg/ha was expected to increase the maize yield by 1.00903 tonnes/hectare (CI = (1.00606, 1.01193)).
+
+For sandy loam soil, increasing the water by 1 mm was expected to increase maize yield by 1.00134 tonnes/hectare (CI = (1.00035, 1.00234)). Increasing the nitrogen level by 1 kg/ha was expected to increase the maize yield by 1.0059 tonnes/hectare (CI = (1.00534, 1.00647)).
+
+For silt loam soil, increasing the water by 1 mm was expected to increase maize yield by 1.00371 tonnes/hectare (CI = (1.00239, 1.0052)). Increasing the nitrogen level by 1 kg/ha was expected to increase the maize yield by 1.00525 tonnes/hectare (CI = (1.00332, 1.0072)).
+
+# Discussion
+
+Increasing water on maize crops seemed to yield greater increases in maize yields for sandy, loam, and silt loam soil. This result is to be expected, because these types of soil have coarser particles and are worse at retaining water. Thus increasing water compensates for the soil's reduced ability to hold water. Increasing water doesn't increase maize yield as much for soil with finer particles and good water retention, like clay. 
+
+For the coarser soil types which are worse at retaining nutrients, such as sandy, sandy loam, and silt loam soils, the model indicates that increasing the nitrogen through fertilization will be associated with greater increases in maize yields. This result is also consistent with previous findings. It should be noted that it is unknown whether the farmers employed mulching during these studies, which can also help keep shallow parts of the soil moist, and may possibly influence the soil's ability to hold onto nutrients. 
+
+Even though the model coefficients may appear small and differences between different soil types' coefficients may be very small, the yield is measured in tonnes per hectare, and multiplying the effects over large regions could result in significant yields overall. However, caution should be taken with applying these results in practice, as local availability of water and nutrients in nature, among other factors, must be considered. Areas with sandy soil may have less rainfall to begin with, so even though adding more water to maize plants in sandy soil likely results in greater increases in yield, it may end up becoming costly for farmers. Growing maize in sandy soil and achieving high yields is possible, however farmers must ensure that they optimize their supply chain and apply water and nitrogen fertilizer efficiently.
+
+## Future Work
+
+A more thorough literature review needs to be conducted to see if previous researchers have created Bayesian models for maize yield using more informative priors than the standard normal priors in this model. A model updated with more informative priors may fit better, and the simulated maize yields and observed maize yields may be closer to each other. Due to limited time, the simple equation $E[y_{j} | \alpha_{j[i]}, \beta_{j[i]}, \gamma_{j[i]}, \sigma^2_y ] = \alpha_{j[i]} + \beta_{j[i]}N_i + \gamma_{j[i]}W_i$ was used to model the mean maize yield at each soil level. However, it may be worthwhile to investigate transformations for the nitrogen covariate at each soil level, especially given that some soil types' maize yields did not change linearly in response to nitrogen levels. 
+
+In addition to modeling the effects of water and nitrogen, it would be interesting to model other variables that influence maize growth. It would be interesting to aggregate more data on other nutrients from other studies on maize yield. It would also be interesting to investigate the effect of organic vs chemical fertilizers on Nitrogen intake and yield. In addition, it would also be interesting to investigate the effect of different genetic modifications and maize varieties and how that affects maize's ability to efficiently use water, nitrogen, and other nutrients in different soil types. There would also be important practical implications of investigating the effects of different farming techniques like crop rotation, mulching, and soil tilling. There are many more factors influencing maize yield which have not been discussed, and are worth studying.
+
+Overall, there still remains a lot of work that can be done to improve this simple model.
+
+# Appendix
+
+Here is a diagram indicating the soil types by percentage of clay, silt and sand.
+
+![Soil Types](./soiltriangle_large.jpg){width=250}
+
+Log(yield) did not seem to follow a normal distribution.
+
+```{r}
+qqnorm(log(datamaizechina$Yield))
+qqline(log(datamaizechina$Yield))
+```
+
+For most soil types except silt loam, increasing plant density seemed to increase yield. Perhaps farmers already knew how dense to plant their seeds before plants start competing with each other
+
+```{r}
+datamaizechina %>% ggplot(aes(x=(PPH), y=Yield, col=Texture)) + geom_point() + geom_smooth(method="lm", se=FALSE) + labs(x="Number of Plants Per Hectare", y="Yield (t/ha)") + theme_bw()
+```
+
+Soil Organic Carbon did not seem particularly significant for most soil types. Within each soil type, there was also little variation in values of Soil Organic Carbon.
+
+```{r}
+datamaizechina %>% ggplot(aes(y=SOC, x=Texture)) + geom_boxplot() + labs(x="Initial Soil Organic Carbon", y="Yield (t/ha)") + theme_bw()
+```
+
+```{r}
+datamaizechina %>% ggplot(aes(x=SOC, y=Yield, col=Texture)) + geom_point() + labs(x="Initial Soil Organic Carbon", y="Yield (t/ha)") + geom_smooth(method="lm") + theme_bw()
+```
+
+```{r}
+cor(datamaizechina$Water, datamaizechina$Nitrogen)
+plot(datamaizechina$Water, datamaizechina$Nitrogen)
+plot(datamaizechina$Water, datamaizechina$PPH)
+plot(datamaizechina$Nitrogen, datamaizechina$PPH)
+```
+
+### Posterior Checks for Loam Soil
+
+```{r}
+#datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("clay loam", "loam", "silt loam", "sandy loam"))
+datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("loam"))
+maize2 <- box(datamaizechina2$Yield, bestlambda)
+#maize2 <- log(datamaizechina2$Yield)
+water2 <- datamaizechina2$Water 
+nitrogen2 <- datamaizechina2$Nitrogen
+N2 <- nrow(datamaizechina2)
+J2 <- length(unique(datamaizechina2$Texture))
+soil2 <- as.numeric(as.factor(datamaizechina2$Texture))
+
+stan_data2 <- list(N = N2, maize = maize2, nitrogen = nitrogen2, water = water2, J = J2, soil = soil2)
+
+mod2 <- stan(data = stan_data2, file = "maize.stan", seed = 777)
+
+y2 <- maize2
+yrep12 <- extract(mod2)[["y_hat"]]
+samp1002 <- sample(nrow(yrep12), 100)
+ppc_dens_overlay(y2, yrep12[samp1002, ])
+```
+
+```{r}
+ppc_stat(y2, yrep12, stat = 'median')
+```
+
+### Posterior Checks for Clay Loam Soil
+
+```{r}
+#datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("clay loam", "loam", "silt loam", "sandy loam"))
+datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("clay loam"))
+maize2 <- box(datamaizechina2$Yield, bestlambda)
+#maize2 <- datamaizechina2$Yield
+water2 <- datamaizechina2$Water 
+nitrogen2 <- datamaizechina2$Nitrogen 
+N2 <- nrow(datamaizechina2)
+J2 <- length(unique(datamaizechina2$Texture))
+soil2 <- as.numeric(as.factor(datamaizechina2$Texture))
+
+stan_data2 <- list(N = N2, maize = maize2, nitrogen = nitrogen2, water = water2, J = J2, soil = soil2)
+
+mod2 <- stan(data = stan_data2, file = "maize.stan", seed = 777)
+
+y2 <- maize2
+yrep12 <- extract(mod2)[["y_hat"]]
+samp1002 <- sample(nrow(yrep12), 100)
+ppc_dens_overlay(y2, yrep12[samp1002, ])
+
+ppc_stat(y2, yrep12, stat = 'median')
+```
+
+### Posterior Checks for Silt Loam Soil
+
+```{r}
+#datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("clay loam", "loam", "silt loam", "sandy loam"))
+datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("silt loam"))
+maize2 <- box(datamaizechina2$Yield, bestlambda)
+#maize2 <- datamaizechina2$Yield
+water2 <- datamaizechina2$Water
+nitrogen2 <- datamaizechina2$Nitrogen 
+N2 <- nrow(datamaizechina2)
+J2 <- length(unique(datamaizechina2$Texture))
+soil2 <- as.numeric(as.factor(datamaizechina2$Texture))
+
+stan_data2 <- list(N = N2, maize = maize2, nitrogen = nitrogen2, water = water2, J = J2, soil = soil2)
+
+mod2 <- stan(data = stan_data2, file = "maize.stan", seed = 777)
+
+y2 <- maize2
+yrep12 <- extract(mod2)[["y_hat"]]
+samp1002 <- sample(nrow(yrep12), 100)
+ppc_dens_overlay(y2, yrep12[samp1002, ])
+
+ppc_stat(y2, yrep12, stat = 'median')
+```
+
+### Posterior Checks for Sandy Loam Soil
+
+```{r}
+#datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("clay loam", "loam", "silt loam", "sandy loam"))
+datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("sandy loam"))
+maize2 <- box(datamaizechina2$Yield, bestlambda)
+#maize2 <- datamaizechina2$Yield
+water2 <- datamaizechina2$Water 
+nitrogen2 <- datamaizechina2$Nitrogen
+N2 <- nrow(datamaizechina2)
+J2 <- length(unique(datamaizechina2$Texture))
+soil2 <- as.numeric(as.factor(datamaizechina2$Texture))
+
+stan_data2 <- list(N = N2, maize = maize2, nitrogen = nitrogen2, water = water2, J = J2, soil = soil2)
+
+mod2 <- stan(data = stan_data2, file = "maize.stan", seed = 777)
+
+y2 <- maize2
+yrep12 <- extract(mod2)[["y_hat"]]
+samp1002 <- sample(nrow(yrep12), 100)
+ppc_dens_overlay(y2, yrep12[samp1002, ])
+
+ppc_stat(y2, yrep12, stat = 'median')
+```
+
+# References
+
+Yuan Li, Zhou Li, Song Cui, Scott X. Chang, Chunlin Jia, Qingping Zhang, A global synthesis of the effect of water and nitrogen input on maize (Zea mays) yield, water productivity and nitrogen use efficiency, Agricultural and Forest Meteorology, Volume 268, 2019, Pages 136-145, ISSN 0168-1923, https://doi.org/10.1016/j.agrformet.2019.01.018.
+(https://www.sciencedirect.com/science/article/pii/S0168192319300188)
