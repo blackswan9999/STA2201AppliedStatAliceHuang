@@ -2,8 +2,15 @@
 title: "A Bayesian Hierarchial Model for Maize Yield"
 author: "Alice Huang"
 date: "04/04/2023"
-output: pdf_document
-abstract: "We investigate the effects of water and nitrogen levels on maize yields across different soil types in China. We fit a Bayesian hierarchical model with a Normal likelihood on maize yield, grouping by soil type and investigating the effects of water and nitrogen within each soil type. We show that increasing water and nitrogen results in greater increases in maize yields for coarser soil types that are worse at retaining water and nutrients."  
+output:
+  html_document:
+    df_print: paged
+abstract: We investigate the effects of water and nitrogen levels on maize yields
+  across different soil types in China. We fit a Bayesian hierarchical model with
+  a Normal likelihood on maize yield, grouping by soil type and investigating the
+  effects of water and nitrogen within each soil type. We show that increasing water
+  and nitrogen results in greater increases in maize yields for coarser soil types
+  that are worse at retaining water and nutrients.
 ---
 
 ```{r setup, include=FALSE}
@@ -44,7 +51,7 @@ Soil Organic Content (SOC) was missing 168 observations, but there didn't seem t
 After removing all missing data, there were 709 observations remaining from 52 studies done on 39 locations in China.
 
 ```{r}
-datamaize <- read_csv("Book2.csv")
+datamaize <- read_csv("https://raw.githubusercontent.com/blackswan9999/STA2201AppliedStatAliceHuang/main/Book2.csv")
 datamaize_readme <- read_xlsx("Dataset instrumetn.xlsx")
 
 datamaizechina <- datamaize %>% filter(Region == "China") %>%
