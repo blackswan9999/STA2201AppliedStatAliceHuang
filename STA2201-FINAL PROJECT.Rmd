@@ -3,6 +3,7 @@ title: "A Bayesian Hierarchial Model for Maize Yield"
 author: "Alice Huang"
 date: "04/04/2023"
 output:
+  pdf_document: default
   html_document:
     df_print: paged
 abstract: We investigate the effects of water and nitrogen levels on maize yields
@@ -51,19 +52,24 @@ Soil Organic Content (SOC) was missing 168 observations, but there didn't seem t
 After removing all missing data, there were 709 observations remaining from 52 studies done on 39 locations in China.
 
 ```{r}
+# read in dataset
 datamaize <- read_csv("https://raw.githubusercontent.com/blackswan9999/STA2201AppliedStatAliceHuang/main/Book2.csv")
 datamaize_readme <- read_xlsx("Dataset instrumetn.xlsx")
 
+# get only observations in China, select variables we're interested in
 datamaizechina <- datamaize %>% filter(Region == "China") %>%
   dplyr::select(Yield, MAT, Texture, PPH, SOC, Water, Nitrogen)
 
+# filter out rows with missing Yield
 datamaizechina %>% filter(!is.na(Yield)) -> datamaizechina
 
+# make sure text entries for soil types are consistent
 datamaizechina["Texture"][datamaizechina["Texture"] == "silty loam"] <- "silt loam"
 datamaizechina["Texture"][datamaizechina["Texture"] == "loamy clay"] <- "clay loam"
 datamaizechina["Texture"][datamaizechina["Texture"] == "slity clay"] <- "clay silt"
 datamaizechina["Texture"][datamaizechina["Texture"] == "heavy loam"] <- "loam"
 
+# filter out rows with missing soil information
 datamaizechina %>% filter(!is.na(Texture)) -> datamaizechina
 ```
 
@@ -79,8 +85,10 @@ We see that there is less data available for the clay and sandy soil texture typ
 
 ```{r fig.height=2.75, fig.width=4}
 library(ggrepel)
+# create dataframe with proportions of soil types in dataset
 datamaizechina %>% group_by(Texture) %>%
   summarize(prop = n()/nrow(datamaizechina)) -> dfpie
+# make a pie chart for proportions of soil types in dataset
 dfpie %>%  ggplot(aes(x="", y= prop, fill = Texture)) +
   geom_col() + 
   coord_polar(theta = "y") + theme_bw() +
@@ -237,10 +245,17 @@ We compare the densities of 100 sampled yields to the actual yield. The densitie
 require(gridExtra)
 set.seed(777)
 y <- maize
+# extract simulated maize yield estimates under model
 yrep1 <- extract(mod)[["y_hat"]]
+# randomly sample 100 of those estimates
 samp100 <- sample(nrow(yrep1), 100)
+# plot the 100 maize yield estimates' densities 
+# along with the observed maize yield estimate's density  
 plot_ys <- ppc_dens_overlay(y, yrep1[samp100, ])
+# plot the simulated median maize estimates
+# along with the observed median maize yield from dataset
 plot_meds <- ppc_stat(y, yrep1, stat = 'median')
+# arrange two graphs side by side
 grid.arrange(plot_ys, plot_meds, ncol=2)
 ```
 
@@ -342,8 +357,8 @@ plot(datamaizechina$Nitrogen, datamaizechina$PPH)
 ```{r}
 #datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("clay loam", "loam", "silt loam", "sandy loam"))
 datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("loam"))
-#maize2 <- box(datamaizechina2$Yield, bestlambda2)
-maize2 <- log(datamaizechina2$Yield)
+maize2 <- box(datamaizechina2$Yield, bestlambda)
+#maize2 <- log(datamaizechina2$Yield)
 water2 <- datamaizechina2$Water 
 nitrogen2 <- datamaizechina2$Nitrogen
 N2 <- nrow(datamaizechina2)
@@ -369,8 +384,8 @@ ppc_stat(y2, yrep12, stat = 'median')
 ```{r}
 #datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("clay loam", "loam", "silt loam", "sandy loam"))
 datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("clay loam"))
-#maize2 <- box(datamaizechina2$Yield, bestlambda2)
-maize2 <- datamaizechina2$Yield
+maize2 <- box(datamaizechina2$Yield, bestlambda)
+#maize2 <- datamaizechina2$Yield
 water2 <- datamaizechina2$Water 
 nitrogen2 <- datamaizechina2$Nitrogen 
 N2 <- nrow(datamaizechina2)
@@ -394,8 +409,8 @@ ppc_stat(y2, yrep12, stat = 'median')
 ```{r}
 #datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("clay loam", "loam", "silt loam", "sandy loam"))
 datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("silt loam"))
-#maize2 <- box(datamaizechina2$Yield, bestlambda2)
-maize2 <- datamaizechina2$Yield
+maize2 <- box(datamaizechina2$Yield, bestlambda)
+#maize2 <- datamaizechina2$Yield
 water2 <- datamaizechina2$Water
 nitrogen2 <- datamaizechina2$Nitrogen 
 N2 <- nrow(datamaizechina2)
@@ -419,8 +434,8 @@ ppc_stat(y2, yrep12, stat = 'median')
 ```{r}
 #datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("clay loam", "loam", "silt loam", "sandy loam"))
 datamaizechina2 <- datamaizechina %>% filter(Texture %in% c("sandy loam"))
-#maize2 <- box(datamaizechina2$Yield, bestlambda2)
-maize2 <- datamaizechina2$Yield
+maize2 <- box(datamaizechina2$Yield, bestlambda)
+#maize2 <- datamaizechina2$Yield
 water2 <- datamaizechina2$Water 
 nitrogen2 <- datamaizechina2$Nitrogen
 N2 <- nrow(datamaizechina2)
